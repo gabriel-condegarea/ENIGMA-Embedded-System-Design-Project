@@ -1,2 +1,6 @@
-# ENIGMA-Embedded-System-Design-Project
-ENIGMA est un projet d’ingénierie visant à concevoir et développer un système embarqué intelligent combinant conception électronique et développement logiciel. L’objectif est de réaliser une plateforme capable d’acquérir, traiter et exploiter des données via un microcontrôleur, tout en assurant une communication fiable avec une interface utilisateur. Le projet intègre la conception matérielle (choix du microcontrôleur, gestion des GPIO, timers, interruptions, alimentation, protection ESD) ainsi que l’architecture logicielle (modules, gestion des données, communication USB ou série, robustesse et gestion des erreurs). Une attention particulière est portée à la performance, à la sécurité et à la modularité du système afin de garantir une solution évolutive et industrielle. ENIGMA illustre une approche complète d’ingénierie, de l’analyse des besoins jusqu’à l’implémentation et la validation du système.
+# ENIGMA Project
+Projet Multi HEIG-VD
+2026
+
+The aim of the project is to design and build a fully functional, accurate prototype of the Enigma machine using modern technology. The Enigma machine was used in various forms from 1930 until the end of the Second World War to encrypt and decrypt messages for commercial and military purposes. Since then, the machine has become highly sought-after
+by history and cryptography museums.
