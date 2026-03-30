@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string.h>
+
 //const
 #define ROTATE 26
 
@@ -23,11 +25,10 @@ struct Enigma {
 };
 
 
-//global vars
-extern const char *alpha;
-extern const char *rotor_ciphers[];
-extern const char *rotor_notches[];
-extern const char *rotor_turnovers[];
-extern const char *reflectors[];
-extern const char *rotor_names[];
-extern const char *plugboard;
+//function prototypes
+struct Rotor new_rotor(struct Enigma *machine, int rotornumber, int offset, int stellung);
+int str_index(const char *str, int character);
+void rotor_cycle(struct Rotor *rotor);
+int rotor_forward(struct Rotor *rotor, int index);
+int rotor_reverse(struct Rotor *rotor, int index);
+

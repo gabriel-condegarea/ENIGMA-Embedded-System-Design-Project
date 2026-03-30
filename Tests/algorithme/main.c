@@ -58,7 +58,16 @@ C           FVPJIAOYEDRZXWGCTKUQSBNMHL
 #include "enigma.h" //constants, definitions etc.
 
 
+//global vars
+extern char *alpha;
+extern char *rotor_ciphers[];
+extern char *rotor_notches[];
+extern char *rotor_turnovers[];
+extern char *reflectors[];
+extern char *rotor_names[];
 
+const char *plugboard = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";  
+            //"ABCDEFGHIJKLMNOPQRSTUVWXYZ";   //TODO find a way to fill in 
 
 /*
  * Run the enigma machine

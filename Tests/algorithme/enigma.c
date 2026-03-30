@@ -27,8 +27,6 @@ const char *reflectors[] = {
 
 const char *rotor_names[] = {"I", "II", "III", "IV", "V", "VI", "VII", "VIII"};  //rotor roman numerals
 
-const char *plugboard = "SBCDEFGHIJKLMNOQPRATUVWXYZ";   //swap AS PQ
-            //"ABCDEFGHIJKLMNOPQRSTUVWXYZ";   //TODO find a way to fill in 
 
 
 
@@ -55,7 +53,8 @@ struct Rotor new_rotor(struct Enigma *machine, int rotornumber, int offset, int 
  * Return the index position of a character inside a string
  * if not found then -1
  **/
-int str_index(const char *str, int character) {
+int str_index(const char *str, int character) 
+{
     char *pos;
     int index;
     pos = strchr(str, character);
@@ -73,7 +72,8 @@ int str_index(const char *str, int character) {
 /*
  * Cycle a rotor's offset but keep it in the array.
  */
-void rotor_cycle(struct Rotor *rotor) {
+void rotor_cycle(struct Rotor *rotor)
+{
     rotor->offset++;
     rotor->offset = rotor->offset % ROTATE;
 
@@ -87,7 +87,8 @@ void rotor_cycle(struct Rotor *rotor) {
  * Pass through a rotor, right to left, cipher to alpha.
  * returns the exit index location.
  */
-int rotor_forward(struct Rotor *rotor, int index) {
+int rotor_forward(struct Rotor *rotor, int index) 
+{
 
     // In the alpha side, out the cipher side
     index = (ROTATE + index + rotor->offset - rotor->stellung)  % ROTATE;   //add offset
@@ -101,7 +102,8 @@ int rotor_forward(struct Rotor *rotor, int index) {
  * Pass through a rotor, left to right, alpha to cipher.
  * returns the exit index location.
  */
-int rotor_reverse(struct Rotor *rotor, int index) {
+int rotor_reverse(struct Rotor *rotor, int index)
+{
 
     // In the cipher side, out the alpha side
     index = (ROTATE + index + rotor->offset - rotor->stellung) % ROTATE;   //add offset
