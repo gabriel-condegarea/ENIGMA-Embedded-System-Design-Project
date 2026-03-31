@@ -1,10 +1,13 @@
 #pragma once
 
 #include <string.h>
+#include <stdint.h>
+#include <stdio.h>
 
 //const
 #define ROTATE 26
 
+#define OPT_DEBUG 1
 
 //structures
 struct Rotor 
@@ -31,4 +34,6 @@ int str_index(const char *str, int character);
 void rotor_cycle(struct Rotor *rotor);
 int rotor_forward(struct Rotor *rotor, int index);
 int rotor_reverse(struct Rotor *rotor, int index);
+uint8_t cycleAllRotors(struct Enigma *machine, uint8_t inChar);
+uint8_t enigma_encrypt(struct Enigma *machine, uint8_t inChar);
 
