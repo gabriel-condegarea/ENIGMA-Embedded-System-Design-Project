@@ -84,7 +84,6 @@ int main(int argc, char *argv[])
     int opt_o1 = 0, opt_o2 = 0, opt_o3 = 0; //rotor offset (start pos)
     int opt_s1 = 0, opt_s2 = 0, opt_s3 = 0; //ring setting (stellung)
 
-
     // Command Parsing
     for (i = 1; i < argc; i++)  //for each parameter
     {
@@ -143,8 +142,6 @@ int main(int argc, char *argv[])
         //TODO KEYBOARD SEEK COMES HERE
         character = toupper(character);
   
-
-
         if(opt_debug) 
         {
             printf("Input character ******** %c \n", character);

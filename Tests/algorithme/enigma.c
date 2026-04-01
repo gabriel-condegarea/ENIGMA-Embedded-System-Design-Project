@@ -95,10 +95,10 @@ int rotor_forward(struct Rotor *rotor, int index)
 {
 
     // In the alpha side, out the cipher side
-    index = (ROTATE + index + rotor->offset - rotor->stellung)  % ROTATE;   //add offset
+    index = (ROTATE + index + rotor->offset - rotor->stellung)  % ROTATE;   //add offset + stellung
     index = str_index(alpha, rotor->cipher[index]); //find corresponding letter
 
-    index = (ROTATE + index - rotor->offset + rotor->stellung) % ROTATE;  //remove offset
+    index = (ROTATE + index - rotor->offset + rotor->stellung) % ROTATE;  //remove offset + stellung
     return index;
 }
 
