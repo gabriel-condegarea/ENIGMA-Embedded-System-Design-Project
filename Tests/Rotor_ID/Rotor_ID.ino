@@ -1,7 +1,9 @@
-#define EN_PIN 16
-#define DIR_PIN 18
-#define STEP_PIN 17
-#define SWI_PIN 15
+#define EN_PIN 21
+#define DIR_PIN 23
+#define STEP_PIN 22//LED_BUILTIN
+
+
+#define SENSOR 4
 
 
 
@@ -14,7 +16,7 @@ void setup()
   Serial.begin(115200);
   while(!Serial);
 
-  pinMode(SWI_PIN, INPUT_PULLUP);
+  pinMode(SENSOR, INPUT);
 
   pinMode(EN_PIN, OUTPUT);
   pinMode(DIR_PIN, OUTPUT);
@@ -29,14 +31,15 @@ void setup()
 
 void loop() 
 {
-  swiNew = digitalRead(SWI_PIN);
-  if(swiNew < swiOld)
+  for(int i = 0; i<NUMSTEPS; i++)
   {
-    Serial.println("Swi pressed");
+    digitalWrite(STEP_PIN, 1);
+    delayMicroseconds(PULSEDELAY);
+    digitalWrite(STEP_PIN, 0);
   }
-  swiOld = swiNew;
+  Serial.println("Here");
 
-
+  delay(1000);
 }
 
 bool stepOneLetter(int ENPin, int DIRPIN, int STEPPin)  //in the end a rotor structure probably
