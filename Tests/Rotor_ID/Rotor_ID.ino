@@ -2,13 +2,12 @@
 #define DIR_PIN 23
 #define STEP_PIN 22//LED_BUILTIN
 
-
-#define SENSOR 4
+#define SENSOR 15
 
 
 
 #define NUMSTEPS 31  //Microstep 2
-#define PULSEDELAY 300
+#define PULSEDELAY 500
 
 
 void setup() 
@@ -16,7 +15,7 @@ void setup()
   Serial.begin(115200);
   while(!Serial);
 
-  pinMode(SENSOR, INPUT);
+  pinMode(SENSOR, INPUT_PULLUP);
 
   pinMode(EN_PIN, OUTPUT);
   pinMode(DIR_PIN, OUTPUT);
@@ -27,19 +26,26 @@ void setup()
   digitalWrite(EN_PIN, LOW);  //enable torque
   Serial.println("Ready to test");
   
-}
+} 
+
+uint8_t letter = 0;
+uint16_t data = 0;
 
 void loop() 
-{
+{ 
+  data = analogRead(SENSOR);
+  Serial.println(data);
+
   for(int i = 0; i<NUMSTEPS; i++)
   {
     digitalWrite(STEP_PIN, 1);
-    delayMicroseconds(PULSEDELAY);
+    delay(2);
     digitalWrite(STEP_PIN, 0);
   }
-  Serial.println("Here");
+
 
   delay(1000);
+
 }
 
 bool stepOneLetter(int ENPin, int DIRPIN, int STEPPin)  //in the end a rotor structure probably
