@@ -1,47 +1,172 @@
 # ENIGMA Project
-Projet Multi HEIG-VD
-2026
+**Multi HEIG-VD Project**  
+**2026**
 
-The aim of the project is to design and build a fully functional, accurate prototype of the Enigma machine using modern technology. The Enigma machine was used in various forms from 1930 until the end of the Second World War to encrypt and decrypt messages for commercial and military purposes. Since then, the machine has become highly sought-after
-by history and cryptography museums.
+The goal of this project is to design and build a fully functional and accurate prototype of the **Enigma machine** using modern embedded technologies. Originally used from the 1930s until the end of the Second World War, the Enigma machine encrypted and decrypted messages for both commercial and military purposes. Today, it remains one of the most iconic devices in the history of cryptography. This project combines software development, embedded programming, and hardware integration to recreate the Enigma machine's functionality while providing an educational demonstration of its operation. The project is structured to allow for modular testing of each hardware component before full integration, ensuring a robust and reliable final product.
 
-## Présentation du Projet ENIGMA-Embedded-System-Design-Project
+---
 
-**Contexte et Objectif**  
-Ce projet vise à concevoir et construire un prototype fonctionnel et précis de la machine Enigma, célèbre pour son rôle dans le chiffrement de messages pendant la Seconde Guerre mondiale. L'approche moderne intègre des technologies embarquées pour recréer fidèlement le mécanisme mécanique original, tout en permettant le chiffrement et déchiffrement de messages. Il s'agit d'un projet académique (Multi HEIG-VD, 2026) combinant algorithmique et ingénierie matérielle.
+## Table of Contents
 
-**Technologies Utilisées**  
-- **Logiciel** : Langage C (standard C11) pour l'implémentation de l'algorithme de chiffrement Enigma. Compilation via GCC avec un Makefile pour automatiser le build.  
-- **Matériel** : Plateformes Arduino pour les composants embarqués, incluant :  
-  - Moteurs pas à pas (pour simuler la rotation des rotors physiques).  
-  - LED WS2812B (via bibliothèque Adafruit NeoPixel) pour l'affichage des lettres chiffrées.  
-  - Claviers matriciels (scanning de touches).  
-  - Capteurs magnétiques et analogiques pour la détection de positions (ex. : pôles N/S pour identifier les rotors).  
+- [ENIGMA Project](#enigma-project)
+  - [Table of Contents](#table-of-contents)
+  - [Project Overview](#project-overview)
+  - [Objectives](#objectives)
+  - [Historical Background](#historical-background)
+  - [System Features](#system-features)
+    - [Software Features](#software-features)
+    - [Hardware Features](#hardware-features)
+    - [Engineering Features](#engineering-features)
+  - [Technologies Used](#technologies-used)
+    - [Software](#software)
+    - [Embedded Hardware](#embedded-hardware)
+    - [Libraries](#libraries)
+  - [Project Architecture](#project-architecture)
+    - [1. Software Layer](#1-software-layer)
+    - [2. Hardware Layer](#2-hardware-layer)
+    - [3. Test-Oriented Design](#3-test-oriented-design)
+  - [Repository Structure](#repository-structure)
 
-**Structure du Projet**  
-Le projet est organisé autour d'un dossier racine avec un README.md descriptif, et un sous-dossier `Tests/` contenant :  
-- `algorithme/` : Cœur logiciel en C.  
-  - `enigma.h` : Définitions des structures (rotors, machine Enigma) et prototypes de fonctions (rotation, chiffrement).  
-  - `enigma.c` : Implémentation des fonctions de chiffrement (rotation des rotors, passage avant/arrière, cycle des rotors).  
-  - `main.c` : Point d'entrée avec commentaires détaillés sur les configurations historiques des rotors et réflecteurs Enigma.  
-  - `Makefile` : Automatisation de la compilation (cible `app` pour l'exécutable).  
-- Tests matériels individuels (fichiers `.ino` pour Arduino) :  
-  - `Keyboard_LED.ino` : Test du clavier matriciel + affichage LED.  
-  - `LED_simple.ino` : Test d'effets visuels sur LED NeoPixel.  
-  - `magnetic_sensor.ino` : Test de capteurs magnétiques pour détection de pôles.  
-  - `Rotor_ID.ino` : Test d'identification des rotors via capteurs.  
-  - `Stepper.ino` : Contrôle de moteurs pas à pas pour rotation mécanique.  
+---
 
-**Architecture Générale**  
-- **Couche Logicielle** : Implémentation pure de l'algorithme Enigma en C. La machine est modélisée avec des rotors (structures avec offset, position, câblage) et un réflecteur. Le chiffrement suit le processus historique : passage à travers les rotors (avant), réflexion, puis retour (arrière), avec rotation automatique des rotors.  
-- **Couche Matérielle** : Intégration embarquée via Arduino. Les composants physiques (rotors mécaniques, clavier, LED) sont contrôlés pour synchroniser avec la logique logicielle. Les tests isolent chaque composant pour validation.  
-- **Interface** : Entrée via clavier matriciel ; sortie via LED pour visualisation des lettres chiffrées.  
+## Project Overview
 
-**Flux Principal de l'Application**  
-1. **Entrée** : L'utilisateur appuie sur une touche du clavier matriciel (scanné par Arduino).  
-2. **Chiffrement Logiciel** : La lettre est passée à l'algorithme Enigma (rotation des rotors virtuels, substitution via câblages).  
-3. **Action Matérielle** : Les moteurs pas à pas tournent les rotors physiques pour refléter l'état logique. Les capteurs vérifient les positions.  
-4. **Sortie** : La lettre chiffrée est affichée sur les LED WS2812B.  
-Le processus est réversible (chiffrement = déchiffrement grâce au réflecteur).  
+This project aims to recreate the **Enigma machine** as a modern embedded system while preserving the core principles of its original electromechanical operation. The project combines:
 
-Ce projet illustre une fusion entre cryptographie historique et ingénierie moderne, idéal pour l'apprentissage de systèmes embarqués et d'algorithmes de sécurité. Pour un nouveau développeur, commencez par compiler et exécuter `Tests/algorithme/app` pour tester l'algorithme, puis flashez les sketches Arduino pour les composants matériels.
+- **cryptographic algorithm design**
+- **embedded programming**
+- **hardware integration**
+- **modular testing of physical components**
+
+The result is an academic prototype capable of simulating the historical encryption and decryption process while interacting with real hardware such as a keyboard matrix, LEDs, sensors, and stepper motors.
+
+---
+
+## Objectives
+
+The main objectives of the project are:
+
+- Reproduce the logic of the original Enigma machine
+- Implement the encryption algorithm in **C (C11)**
+- Design a modular embedded architecture using **Arduino**
+- Integrate physical input and output components
+- Validate each hardware subsystem independently before full integration
+- Provide a faithful and educational demonstration of historical cryptography using modern tools. 
+
+---
+
+## Historical Background
+
+The Enigma machine was a rotor-based cipher device used extensively during the 20th century. Its operation relied on:
+
+- a keyboard for user input
+- a set of rotating wired rotors
+- a reflector to send the signal back through the rotor stack
+- a lampboard to display the encrypted letter
+
+One of the most remarkable properties of the Enigma system is that the encryption process is **reversible**: the same machine configuration can be used both to encrypt and decrypt a message. This project recreates that principle with a combination of software logic and embedded hardware.
+
+---
+
+## System Features
+
+### Software Features
+- Complete implementation of the Enigma encryption algorithm in **C**
+- Rotor data structures with:
+  - wiring
+  - position
+  - offset
+- Reflector modeling
+- Forward rotor traversal
+- Reflection
+- Backward rotor traversal
+- Automatic rotor stepping during encryption
+
+### Hardware Features
+- Matrix keyboard scanning for character input
+- WS2812B LED output for encrypted letter display
+- Stepper motor control to simulate physical rotor motion
+- Magnetic and analog sensing to detect positions and identify rotors
+
+### Engineering Features
+- Separation between algorithmic logic and hardware testing
+- Independent validation of subsystems before integration
+- Modular project organization for easier maintenance and debugging
+
+---
+
+## Technologies Used
+
+### Software
+- **C (C11 standard)** for the Enigma algorithm
+- **GCC** compiler
+- **Makefile** for build automation
+- **VS Code** for development and debugging 
+
+### Embedded Hardware
+- **Arduino** platforms
+- **Stepper motors**
+- **WS2812B LEDs**
+- **Matrix keyboards**
+- **Magnetic and analog sensors**
+
+### Libraries
+- **Adafruit NeoPixel** for LED strip control
+
+---
+
+## Project Architecture
+
+The system is divided into two main layers.
+
+### 1. Software Layer
+The Enigma algorithm is implemented as a standalone software module in C. The machine is modeled using structures that represent:
+
+- rotors
+- rotor offsets
+- rotor positions
+- rotor wirings
+- reflector configuration
+
+The encryption process follows the historical Enigma sequence:
+
+1. Rotor stepping
+2. Forward traversal through the rotors
+3. Reflection
+4. Backward traversal through the rotors
+5. Output character generation
+
+### 2. Hardware Layer
+The embedded layer connects the software model to physical components:
+
+- the **keyboard** provides the input
+- the **LEDs** display the encrypted character
+- the **stepper motors** reproduce the rotor movement
+- the **sensors** validate the physical state of the system 
+
+### 3. Test-Oriented Design
+Before full integration, each hardware block is tested individually. This approach reduces debugging complexity and improves reliability during final assembly.
+
+---
+
+## Repository Structure
+
+```text
+.
+├── README.md
+└── Tests/
+    ├── algorithme/
+    │   ├── enigma.h
+    │   ├── enigma.c
+    │   ├── main.c
+    │   └── Makefile
+    ├── Keyboard_LED/
+    │   └── Keyboard_LED.ino
+    ├── LED_simple/
+    │   └── LED_simple.ino
+    ├── magnetic_sensor/
+    │   └── magnetic_sensor.ino
+    ├── Rotor_ID/
+    │   └── Rotor_ID.ino
+    └── Stepper/
+        └── Stepper.ino
