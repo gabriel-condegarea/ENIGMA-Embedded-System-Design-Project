@@ -1,8 +1,8 @@
-#define EN_PIN 21
-#define DIR_PIN 23
-#define STEP_PIN 22//LED_BUILTIN
+#define EN_PIN 9
+#define DIR_PIN 5
+#define STEP_PIN 7
 
-#define SENSOR 15
+#define SENSOR 12
 
 
 
@@ -39,7 +39,7 @@ void loop()
   for(int i = 0; i<NUMSTEPS; i++)
   {
     digitalWrite(STEP_PIN, 1);
-    delay(2);
+    delay(1);
     digitalWrite(STEP_PIN, 0);
   }
 
