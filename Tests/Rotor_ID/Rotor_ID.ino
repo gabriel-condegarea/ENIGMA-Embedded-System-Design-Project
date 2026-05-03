@@ -1,22 +1,27 @@
-#define EN_PIN 6
-#define DIR_PIN 5
-#define STEP_PIN 4
+#include "pinout.h"
+
+#define NUMROTORS 1
+#define ALLROTORS for(r = 0; r < rcfg->numRotors; r++)
+
+
 
 #define SWI 15
 
 #define MAG_THR 15
 
-const uint8_t sensors[2] = {27,26}; //ADC pin 
+const uint8_t sensors[3][2] = {{27,26}, {27,26}, {27,26}}; //ADC pin   //TODO replace with calls to the MCP3008
 // [0] = rotor, [1] = lettre
 
 typedef struct RotorHardware_t
 {
+  uint8_t numRotors;  //number of rotors installed
   uint8_t sensorOffset; //offset from sensor to displayed lettre
+  uint8_t numSteps;   //number of steps for a letter rotation
   uint8_t enPin;        //general enable pin
   uint8_t dirPins[3];   //direction pins
   uint8_t directions[3];//turning direction
   uint8_t stepPins[3];  //step pins
-  
+  uint8_t ident[3][3];  //{rotor#, offset, stellung}
 }RotorHardware_t;
 
 
@@ -33,6 +38,7 @@ struct Rotor
 };
 
 
+RotorHardware_t rotorConfig = {.numRotors= NUMROTORS, .sensorOffset = 9, .numSteps = 40,.enPin = MOTOR_EN_PIN, .dirPins={DIR0_PIN, DIR1_PIN, DIR2_PIN}, .directions={0,0,0}, .stepPins={STEP0_PIN,STEP1_PIN,STEP2_PIN}};
 
 
 void setup() 
@@ -40,26 +46,18 @@ void setup()
   Serial.begin(115200);
   while(!Serial);
 
-  pinMode(sensors[0], INPUT);
-  pinMode(sensors[1], INPUT);
+  pinMode(sensors[0][0], INPUT);
+  pinMode(sensors[0][1], INPUT);
 
-  pinMode(EN_PIN, OUTPUT);
-  pinMode(DIR_PIN, OUTPUT);
-  pinMode(STEP_PIN, OUTPUT);
+  configRotorsPins(&rotorConfig);
 
-  pinMode(SWI, INPUT_PULLUP);
+  pinMode(SWI, INPUT_PULLUP);  
 
-  //
-  digitalWrite(STEP_PIN, LOW);
-  digitalWrite(DIR_PIN, 0);
 
-  digitalWrite(EN_PIN, LOW);  //enable torque
-  Serial.println("Ready to test");
-  
+  digitalWrite(rotorConfig.enPin, 0); //enable torque
 } 
 
-uint8_t letter = 0;
-uint16_t data = 0;
+//uint16_t data = 0;
 
 uint8_t swiNow = 1, swiOld = 1;
 
@@ -76,163 +74,231 @@ void loop()
     torque ^= 1;
     Serial.print("Torque= ");
     Serial.println(torque);
-    if(torque) digitalWrite(EN_PIN, 0);
-    else digitalWrite(EN_PIN, 1); //disable torque
+    if(torque) digitalWrite(MOTOR_EN_PIN, 0);
+    else digitalWrite(MOTOR_EN_PIN, 1); //disable torque
   }
   swiOld = swiNow;
 
   if(torque)
   {
-    if( (timer%5000) == 0)
+    if( (timer%5000) == 0)  //every 5 seconds
     { 
-      rotorID();
+      rotorID(&rotorConfig);
     }
   }
 
   timer+=10;
-  if(timer >= 65500) timer = 0;
+  if(timer >= 65000) timer = 0;
   delay(10);
 }
 
 
+bool configRotorsPins(RotorHardware_t* rcfg)
+{
+  if(rcfg == NULL) return false;
+
+  uint8_t r = 0;
+
+  pinMode(rcfg->enPin, OUTPUT);
+
+  ALLROTORS
+  {
+    pinMode(rcfg->dirPins[r], OUTPUT);
+    pinMode(rcfg->stepPins[r], OUTPUT);
+
+    digitalWrite(rcfg->stepPins[r], 0);  
+    digitalWrite(rcfg->dirPins[r], rcfg->directions[r]);  //set normal direction
+  }
+
+  return(true);
+}
 
 //rotor identification routine
-bool rotorID(void)
+bool rotorID(RotorHardware_t* rcfg)
 {
-  //future return vars
-  uint8_t textOffset = 0;
-  uint8_t startPos = 0;
+  //
+  if(rcfg == NULL) return(false);
   
   //local vars
-  uint8_t l = 0, i = 0;
-  const int numsteps = 40;
-  int16_t magnetData[2][26] = {0};
-  int16_t lap_avg[2] = {0};
-  uint8_t firstMagnetIdx[2] = {0,0};
-  uint8_t numMagnets[2] = {0};
-  uint8_t rotorNum = 0;
+  uint8_t l = 0, i = 0, r = 0;
+  int16_t magnetData[NUMROTORS][2][26] = {0}; //raw sensor data
+  int16_t lap_avg[NUMROTORS][2] = {0};        //average reading over a lap
+  uint8_t firstMagnetIdx[NUMROTORS][2] = {0}; //index of first magnet
+  uint8_t numMagnets[NUMROTORS][2] = {0};     //number of magnets found
+  uint8_t rotorNum[NUMROTORS] = {0};          //read number of rotor
 
-  const int sensorOffset = 9;
+  uint8_t corrFirstMagnet[NUMROTORS] = {0};     //corrected index for edge cases
+  uint8_t stellungCorrector[NUMROTORS] = {0}; //corrected stellung for edge cases
+  uint8_t digit = 0;
+
 
 
   
-  //offset half a letter (start of next letter)
-  digitalWrite(DIR_PIN, 0);
-  for(i = 0; i<(numsteps/2); i++)
+  //Offset half a letter
+  //set direction
+  ALLROTORS digitalWrite(rcfg->dirPins[r], rcfg->directions[r]);
+
+  for(i = 0; i<(rcfg->numSteps/2); i++) //advance half a letter
   {
-    digitalWrite(STEP_PIN, 1);
+    ALLROTORS digitalWrite(rcfg->stepPins[r], 1);
     delay(5);
-    digitalWrite(STEP_PIN, 0);
+    ALLROTORS digitalWrite(rcfg->stepPins[r], 0);
   }
 
 
   for(l = 0; l<26; l++) //move one lap
   {
-    for(i = 0; i<numsteps; i++) //step one letter
+    for(i = 0; i<rcfg->numSteps; i++) //step one letter
     {
-      digitalWrite(STEP_PIN, 1);
-      
-      magnetData[0][l] += analogRead(sensors[0]);
-      magnetData[1][l] += analogRead(sensors[1]);
-
+      ALLROTORS
+      {
+        digitalWrite(rcfg->stepPins[r], 1);
+        magnetData[r][0][l] += analogRead(sensors[r][0]);
+        magnetData[r][1][l] += analogRead(sensors[r][1]);
+      } 
       delay(4);
-      digitalWrite(STEP_PIN, 0);
+      ALLROTORS digitalWrite(rcfg->stepPins[r], 0);
     }
-    magnetData[0][l] /= numsteps; //compute average of letter
-    magnetData[1][l] /= numsteps; //compute average of letter
 
-    lap_avg[0] += magnetData[0][l]; //add to turn average
-    lap_avg[1] += magnetData[1][l]; //add to turn average
+    ALLROTORS
+    {
+      magnetData[r][0][l] /= rcfg->numSteps; //compute average of letter
+      magnetData[r][1][l] /= rcfg->numSteps; 
+
+      lap_avg[r][0] += magnetData[r][0][l]; //add to turn average
+      lap_avg[r][1] += magnetData[r][1][l]; 
+    }
 
     delay(50);
   }
   
-  //move back half a letter
-  digitalWrite(DIR_PIN, 1);
-  for(i = 0; i<(numsteps/2); i++)
-  { 
-    digitalWrite(STEP_PIN, 1);
+  //Offset back half a letter
+  //set direction
+  ALLROTORS digitalWrite(rcfg->dirPins[r], !(rcfg->directions[r]));
+
+  for(i = 0; i<(rcfg->numSteps/2); i++) //advance half a letter
+  {
+    ALLROTORS digitalWrite(rcfg->stepPins[r], 1);
     delay(5);
-    digitalWrite(STEP_PIN, 0);
+    ALLROTORS digitalWrite(rcfg->stepPins[r], 0);
   }
 
-  lap_avg[0]/= 26;  //calculate averages for the whole turn
-  lap_avg[1]/= 26;  
+  //set direction correctly again
+  ALLROTORS digitalWrite(rcfg->dirPins[r], (rcfg->directions[r]));
+
+  ALLROTORS
+  {
+    lap_avg[r][0]/= 26;  //calculate averages for the whole turn
+    lap_avg[r][1]/= 26;  
+  }
+
 
   //parse data
   for(l = 0; l<26; l++) 
   {
-    //rotor magnet
-    magnetData[0][l] -= lap_avg[0];
-    if(magnetData[0][l]<MAG_THR && magnetData[0][l]>(-MAG_THR)) magnetData[0][l] = 0;
-    if(magnetData[0][l] >= MAG_THR) magnetData[0][l] = 1;
-    if(magnetData[0][l] <= -MAG_THR) magnetData[0][l] = -1;
-
-    //magnet detected
-    if(magnetData[0][l] != 0)
+    ALLROTORS
     {
-      if(numMagnets[0] == 0)
+      //rotor magnet
+      magnetData[r][0][l] -= lap_avg[r][0]; //normalise to average
+      if(magnetData[r][0][l]<MAG_THR && magnetData[r][0][l]>(-MAG_THR)) magnetData[r][0][l] = 0;
+      if(magnetData[r][0][l] >= MAG_THR) magnetData[r][0][l] = 1;
+      if(magnetData[r][0][l] <= -MAG_THR) magnetData[r][0][l] = -1;
+
+      //magnet detected
+      if(magnetData[r][0][l] != 0)
       {
-        firstMagnetIdx[0] = l;
-      } 
-      //write to rotorNum
-      if(magnetData[0][l] == 1)
-      {
-        rotorNum |= (0x01<< numMagnets[0]); //write 1
+        if(numMagnets[r][0] == 0) //if it's the first
+        {
+          firstMagnetIdx[r][0] = l;
+        } 
+    
+        numMagnets[r][0]++;
+
+        if(numMagnets[r][0]>3) return(false); 
       }
-  
-      numMagnets[0]++;
 
-      if(numMagnets[0]>3) return(false); 
+      //text magnet
+      magnetData[r][1][l] -= lap_avg[r][1];
+      if( magnetData[r][1][l]<MAG_THR && magnetData[r][1][l]>(-MAG_THR)) magnetData[r][1][l] = 0;
+      if( magnetData[r][1][l] >= MAG_THR) magnetData[r][1][l] = 1;
+      if( magnetData[r][1][l] <= -MAG_THR) magnetData[r][1][l] = -1;
+
+      //magnet detected
+      if(magnetData[r][1][l] != 0)
+      {
+        firstMagnetIdx[r][1] = l;
+        numMagnets[r][1]++;
+        if(numMagnets[r][1]>1) return(false); 
+      }  
+
+
+      // Serial.print(magnetData[r][1][l]);
+      // Serial.print(",");    
     }
 
-    magnetData[1][l] -= lap_avg[1];
-    if( magnetData[1][l]<MAG_THR && magnetData[1][l]>(-MAG_THR)) magnetData[1][l] = 0;
-    if( magnetData[1][l] >= MAG_THR) magnetData[1][l] = 1;
-    if( magnetData[1][l] <= -MAG_THR) magnetData[1][l] = -1;
-
-    //magnet detected
-    if(magnetData[1][l] != 0)
-    {
-      firstMagnetIdx[1] = l;
-      numMagnets[1]++;
-      if(numMagnets[1]>1) return(false); 
-    }
-
-    //Serial.print(magnetData[0][l]);
-    //Serial.print(", ");
-    // Serial.print(magnetData[1][l]);
-    // Serial.print(";");
   }
+  // Serial.println(";");
 
 
-
-  //calculate offsets
-  textOffset = (firstMagnetIdx[0] - firstMagnetIdx[1]) >= 0 ?  (firstMagnetIdx[0] - firstMagnetIdx[1])%26 : (firstMagnetIdx[0] - firstMagnetIdx[1]) + 26;
-  startPos = (sensorOffset - firstMagnetIdx[0] + textOffset) >= 0 ? (sensorOffset - firstMagnetIdx[0] + textOffset)%26 : (sensorOffset - firstMagnetIdx[0] + textOffset)+26;
-
-
-  if(numMagnets[0] != 3 || numMagnets[1] != 1) 
+  Serial.println("---------------");
+  //calculate offsets and store to rotorConfig
+  ALLROTORS
   {
-    Serial.println("Not enough magnets found");
-    return(false); //not enough magnets found
+    //error detection and correction
+    corrFirstMagnet[r] = firstMagnetIdx[r][0]; //normal case
+    if(firstMagnetIdx[r][0] == 0) //started on a magnet
+    {
+      if(magnetData[r][0][24] != 0)  //it was the 2nd magnet
+      {
+        stellungCorrector[r] = 2;
+        corrFirstMagnet[r] = 24;
+      }
+      else if(magnetData[r][0][25] != 0)  //it was the 1st magnet
+      {
+        stellungCorrector[r] = 1;
+        corrFirstMagnet[r] = 25;
+      }  
+    }
+
+    //parse rotor number
+    for(i = corrFirstMagnet[r]; i<(corrFirstMagnet[r]+3); i++)
+    {
+      digit = magnetData[r][0][i%26] == -1 ? 0 : 1;
+      rotorNum[r] |= (digit << (i-corrFirstMagnet[r]));
+    }
+   
+
+    rcfg->ident[r][0] = rotorNum[r];
+    rcfg->ident[r][2] = (26 + firstMagnetIdx[r][0] - firstMagnetIdx[r][1] - stellungCorrector[r]) % 26; 
+    rcfg->ident[r][1] = (26 + rcfg->sensorOffset - firstMagnetIdx[r][0] + rcfg->ident[r][2] + stellungCorrector[r]) % 26;
+
+  
+    if(numMagnets[r][0] != 3 || numMagnets[r][1] != 1) 
+    {
+      Serial.print("Rotor ");
+      Serial.print(r);
+      Serial.print(": ");
+      Serial.println("Not enough magnets found");
+      Serial.print(numMagnets[r][0]);
+      Serial.print(", ");
+      Serial.println(numMagnets[r][1]);
+      return(false); //not enough magnets found
+    }
   }
 
   //Print data
   //convert to letter 
   char letter[2] = {0};
-  sprintf(letter, "%c", startPos+'A');
+  sprintf(letter, "%c", rcfg->ident[0][1]+'A');
 
-  Serial.println("---------------");
+
   Serial.println("Identification finished!");
   Serial.print("Rotor number: ");
-  Serial.println(rotorNum, BIN);
+  Serial.println(rcfg->ident[0][0], BIN);
   Serial.print("Start Letter: ");
-  // Serial.print(startPos);
-  // Serial.print(",");
   Serial.println(letter);
-  // Serial.print("Stellung: ");
-  // Serial.println(textOffset);
+  Serial.print("Stellung: ");
+  Serial.println(rcfg->ident[0][2]);
   // Serial.print("First magnet found at: ");
   // Serial.print(firstMagnetIdx[0]);
   // Serial.print(", ");
@@ -242,17 +308,3 @@ bool rotorID(void)
 
   return(true);
 }
-
-/*bool stepOneLetter(uint8_t STEPPin)  //in the end a rotor structure probably
-{
-  const uint8_t numSteps = 40;
-
-  for(int i = 0; i<numSteps; i++)
-  {
-    digitalWrite(STEP_PIN, 1);
-    delay(4);
-    digitalWrite(STEP_PIN, 0);
-  }
-
-  return(true);
-}*/
