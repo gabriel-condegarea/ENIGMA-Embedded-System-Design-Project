@@ -182,7 +182,7 @@ uint8_t enigma_encrypt(struct Enigma *machine, uint8_t inChar)
         printf("Out of reflector as %c\n", machine->reflector[index]);
     }
 
-    // Inbound  //TODO kinda dumb that the reflector works on characters
+    // Inbound 
     character = machine->reflector[index];
     // Outbound
     index = str_index(alpha, character);
