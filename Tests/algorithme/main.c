@@ -58,16 +58,13 @@ C           FVPJIAOYEDRZXWGCTKUQSBNMHL
 #include "enigma.h" //constants, definitions etc.
 
 //global vars
-extern const char *alpha;
+    extern const char *alpha;
+    extern const char *reflectors[];
+    extern const char *rotor_names[];
+// extern const char *plugboard;
 // extern const char *rotor_ciphers[];
 // extern const char *rotor_notches[];
 // extern const char *rotor_turnovers[];
-extern const char *reflectors[];
-extern const char *rotor_names[];
-// extern const char *plugboard;
-
-
-
 
 
 int opt_debug = 0;

@@ -7,7 +7,10 @@
 Adafruit_NeoPixel LED(NUM_LEDS, LED__PIN, NEO_GRB + NEO_KHZ800);
 //insert ioexpander objects here
 
+//global vars
 RotorHardware_t rotorConfig = {.numRotors= NUMROTORS, .sensorOffset = 9, .numSteps = 40,.enPin = MOTOR_EN_PIN, .dirPins={DIR0_PIN, DIR1_PIN, DIR2_PIN}, .directions={0,0,0}, .stepPins={STEP0_PIN,STEP1_PIN,STEP2_PIN}};
+
+
 
 void setup() 
 {

@@ -2,6 +2,8 @@
 #include <Arduino.h>
 #include <Adafruit_NeoPixel.h>
 
+#include "enigma_cipher.h"
+
 /* Constants and configuration */
 //Config
 #define SERIALDEBUG 1
@@ -45,6 +47,7 @@ int8_t readKeyboard(void);
 void sendLED(uint8_t index, Adafruit_NeoPixel* leds);
 bool configRotorsPins(RotorHardware_t* rcfg);
 bool rotorID(RotorHardware_t* rcfg);
+bool moveAllRotors(struct Enigma *machine, RotorHardware_t* rcfg);
 
 
 

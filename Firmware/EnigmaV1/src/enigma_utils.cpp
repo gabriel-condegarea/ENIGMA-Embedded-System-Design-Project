@@ -309,3 +309,42 @@ bool rotorID(RotorHardware_t* rcfg)
 
   return(true);
 }
+
+
+
+bool moveAllRotors(struct Enigma *machine, RotorHardware_t* rcfg)
+{
+  //for each rotor
+  //check if it's real position is the same as software position
+  //if not, move in the correct direction
+
+  uint8_t r = 0, i = 0, m = 0;
+  uint8_t ui8_move = 0;
+  int8_t deltaPos[NUMROTORS] = {0};
+
+
+  ALLROTORS
+  {
+    deltaPos[r] = machine->rotors[r].offset - machine->rotors[r].realPos; //compute offset
+    if(deltaPos[r] != 0)  //move needed
+    {
+      ui8_move >= deltaPos[r] ? ui8_move : deltaPos[r]; //find maximum number of moves
+    } 
+  } 
+
+  for(m = 0; m<ui8_move; m++) //a move is needed
+  {
+    //set direction depending on move direction
+    ALLROTORS digitalWrite(rcfg->dirPins[r], deltaPos[r] > 0 ? rcfg->directions[r] : ! rcfg->directions[r]);
+
+    for(i = 0; i<(rcfg->numSteps); i++) //advance a lettre
+    {
+      ALLROTORS  if(deltaPos[r] != 0) digitalWrite(rcfg->stepPins[r], 1);
+      delay(5);
+      ALLROTORS if(deltaPos[r] != 0) digitalWrite(rcfg->stepPins[r], 0);
+    }
+
+    ALLROTORS deltaPos[r]--;
+  }
+  return(true);
+}
