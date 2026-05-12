@@ -23,12 +23,11 @@ void loop() {
   Serial.println("Scanning...");
   nDevices = 0;
 
-  for(address = 0x20; address < 0x22; address++) 
+  for(address = 0; address < 127; address++) //address = 0x20; address < 0x22; address++) 
   {
     //address = 0x21;
     Wire1.beginTransmission(address);
     error = Wire1.endTransmission();
-    Serial.println(error);
     if (error == 0) {
       Serial.print("I2C device found at address 0x");
       if (address<16) {

@@ -42,6 +42,4 @@
 #define I2C_SCL_PIN     15
 
 
-
-
 #endif // PINOUT_H

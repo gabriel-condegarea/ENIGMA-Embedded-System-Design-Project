@@ -1,98 +1,104 @@
-#include "pinout.h"
-
-#define NUMROTORS 1
-#define ALLROTORS for(r = 0; r < rcfg->numRotors; r++)
+#include "enigma_utils.h"
 
 
+/* Keyboard Utilities */
+const uint8_t row_pins[NUM_ROWS] = {
+    ROW0_PIN, ROW1_PIN, ROW2_PIN, ROW3_PIN, ROW4_PIN, ROW5_PIN};
 
-#define SWI 15
+const uint8_t col_pins[NUM_COLS] = {
+    COL0_PIN, COL1_PIN, COL2_PIN, COL3_PIN, COL4_PIN};
 
-#define MAG_THR 15
+/*
+ * key index = row * NUM_COLS + col
+ *
+ * Keyboard layout:
+ *   ROW0: Q W E R T
+ *   ROW1: A S D F G
+ *   ROW2: Y X C V B
+ *   ROW3: Z U I O P
+ *   ROW4: H J K L [invalid]
+ *   ROW5: N M [backspace] [space] [invalid]
+ *
+ * key_to_led[index] gives the LED index to light.
+ * Invalid keys map to -1.
+ */
+const int8_t key_to_led[NUM_KEYS] = {
+    /* ROW0 */ 0, 1, 2, 3, 4,
+    /* ROW1 */ 18, 17, 16, 15, 14,
+    /* ROW2 */ 19, 20, 21, 22, 23,
+    /* ROW3 */ 5, 6, 7, 8, 9,
+    /* ROW4 */ 13, 12, 11, 10, -1,
+    /* ROW5 */ 24, 25, -1, -1, -1};
 
-const uint8_t sensors[3][2] = {{27,26}, {27,26}, {27,26}}; //ADC pin   //TODO replace with calls to the MCP3008
-// [0] = rotor, [1] = lettre
 
-typedef struct RotorHardware_t
+    /* ───────────────────────────────────────────────
+ * FUNCTION: readKeyboard
+ *
+ * Scans the keyboard matrix once.
+ * Returns:
+ *   -1 if no key is pressed
+ *   key index (0..29) if a key is pressed
+ * ─────────────────────────────────────────────── */
+int8_t readKeyboard(void)
 {
-  uint8_t numRotors;  //number of rotors installed
-  uint8_t sensorOffset; //offset from sensor to displayed lettre
-  uint8_t numSteps;   //number of steps for a letter rotation
-  uint8_t enPin;        //general enable pin
-  uint8_t dirPins[3];   //direction pins
-  uint8_t directions[3];//turning direction
-  uint8_t stepPins[3];  //step pins
-  uint8_t ident[3][3];  //{rotor#, offset, stellung}
-}RotorHardware_t;
+    for (uint8_t row = 0; row < NUM_ROWS; row++)
+    {
+        /* Activate current row */
+        pinMode(row_pins[row], OUTPUT);
+        digitalWrite(row_pins[row], LOW);
 
+        delayMicroseconds(10);
 
-struct Rotor 
-{
-    char            name[5];        //name in roman numerals
-    int             offset;         //position offset (from A)
-    int             stellung;       //ring position from wiring
-    int             turnnext;       
-    const char      *cipher;
-    const char      *turnover;
-    const char      *notch;
-    //probably need to add: real position
-};
+        for (uint8_t col = 0; col < NUM_COLS; col++)
+        {
+            if (digitalRead(col_pins[col]) == LOW)
+            {
+                /* Release current row before returning */
+                digitalWrite(row_pins[row], HIGH);
+                pinMode(row_pins[row], INPUT);
 
+                return (int8_t)(row * NUM_COLS + col);
+            }
+        }
 
-RotorHardware_t rotorConfig = {.numRotors= NUMROTORS, .sensorOffset = 9, .numSteps = 40,.enPin = MOTOR_EN_PIN, .dirPins={DIR0_PIN, DIR1_PIN, DIR2_PIN}, .directions={0,0,0}, .stepPins={STEP0_PIN,STEP1_PIN,STEP2_PIN}};
-
-
-void setup() 
-{ 
-  Serial.begin(115200);
-  while(!Serial);
-
-  pinMode(sensors[0][0], INPUT);
-  pinMode(sensors[0][1], INPUT);
-
-  configRotorsPins(&rotorConfig);
-
-  pinMode(SWI, INPUT_PULLUP);  
-
-
-  digitalWrite(rotorConfig.enPin, 0); //enable torque
-} 
-
-//uint16_t data = 0;
-
-uint8_t swiNow = 1, swiOld = 1;
-
-uint8_t torque = 1;
-uint16_t timer = 0;
-
-char alphabet[27] = {"ABCDEFGHIJKLMNOPQRSTUVWXYZ"};
-
-void loop() 
-{ 
-  swiNow = digitalRead(SWI);
-  if(swiNow < swiOld)
-  {
-    torque ^= 1;
-    Serial.print("Torque= ");
-    Serial.println(torque);
-    if(torque) digitalWrite(MOTOR_EN_PIN, 0);
-    else digitalWrite(MOTOR_EN_PIN, 1); //disable torque
-  }
-  swiOld = swiNow;
-
-  if(torque)
-  {
-    if( (timer%5000) == 0)  //every 5 seconds
-    { 
-      rotorID(&rotorConfig);
+        /* Release current row */
+        digitalWrite(row_pins[row], HIGH);
+        pinMode(row_pins[row], INPUT);
     }
-  }
 
-  timer+=10;
-  if(timer >= 65000) timer = 0;
-  delay(10);
+    return -1;
+}
+
+/* ───────────────────────────────────────────────
+ * FUNCTION: sendLED
+ *
+ * Turns off all LEDs, then lights the LED corresponding
+ * to the given key index.
+ * Invalid/special keys do not light any LED.
+ * ─────────────────────────────────────────────── */
+void sendLED(uint8_t index, Adafruit_NeoPixel* leds)
+{
+    leds->clear();
+
+    if (index < NUM_KEYS)
+    {
+        int8_t led_index = key_to_led[index];
+
+        if (led_index >= 0 && led_index < NUM_LEDS)
+        {
+            leds->setPixelColor(led_index, leds->Color(255, 200, 50));
+        }
+    }
+
+    leds->show();
 }
 
 
+/* ───────────────────────────────────────────────
+ * FUNCTION: configRotorsPins
+ *
+ * Configures the pins used for stepper operation
+ * ─────────────────────────────────────────────── */
 bool configRotorsPins(RotorHardware_t* rcfg)
 {
   if(rcfg == NULL) return false;
@@ -113,10 +119,15 @@ bool configRotorsPins(RotorHardware_t* rcfg)
   return(true);
 }
 
-//rotor identification routine
+/* ───────────────────────────────────────────────
+ * FUNCTION:rotorID
+ *
+ * Rotor "homing" sequence to determine
+ * rotor#, stellung and start position for each 
+ * rotor. Returns false if error.
+ * ─────────────────────────────────────────────── */
 bool rotorID(RotorHardware_t* rcfg)
 {
-  //
   if(rcfg == NULL) return(false);
   
   //local vars
@@ -151,8 +162,8 @@ bool rotorID(RotorHardware_t* rcfg)
       ALLROTORS
       {
         digitalWrite(rcfg->stepPins[r], 1);
-        magnetData[r][0][l] += analogRead(sensors[r][0]);
-        magnetData[r][1][l] += analogRead(sensors[r][1]);
+        //magnetData[r][0][l] += analogRead(sensors[r][0]);   //TODO replace with MCP3008 ADC
+        //magnetData[r][1][l] += analogRead(sensors[r][1]);
       } 
       delay(4);
       ALLROTORS digitalWrite(rcfg->stepPins[r], 0);
@@ -229,16 +240,11 @@ bool rotorID(RotorHardware_t* rcfg)
         if(numMagnets[r][1]>1) return(false); 
       }  
 
-
-      // Serial.print(magnetData[r][1][l]);
-      // Serial.print(",");    
+  
     }
 
   }
-  // Serial.println(";");
 
-
-  Serial.println("---------------");
   //calculate offsets and store to rotorConfig
   ALLROTORS
   {
@@ -272,37 +278,34 @@ bool rotorID(RotorHardware_t* rcfg)
 
   
     if(numMagnets[r][0] != 3 || numMagnets[r][1] != 1) 
-    {
-      Serial.print("Rotor ");
-      Serial.print(r);
-      Serial.print(": ");
-      Serial.println("Not enough magnets found");
-      Serial.print(numMagnets[r][0]);
-      Serial.print(", ");
-      Serial.println(numMagnets[r][1]);
-      return(false); //not enough magnets found
+    {  
+        #if SERIALDEBUG
+            Serial.print("Rotor ");
+            Serial.print(r);
+            Serial.print(": ");
+            Serial.println("Not enough magnets found");
+            Serial.print(numMagnets[r][0]);
+            Serial.print(", ");
+            Serial.println(numMagnets[r][1]);
+        #endif
+        return(false); //not enough magnets found
     }
   }
 
   //Print data
-  //convert to letter 
-  char letter[2] = {0};
-  sprintf(letter, "%c", rcfg->ident[0][1]+'A');
+  #if SERIALDEBUG
+    //convert to letter 
+    char letter[2] = {0};
+    sprintf(letter, "%c", rcfg->ident[0][1]+'A');
 
-
-  Serial.println("Identification finished!");
-  Serial.print("Rotor number: ");
-  Serial.println(rcfg->ident[0][0], BIN);
-  Serial.print("Start Letter: ");
-  Serial.println(letter);
-  Serial.print("Stellung: ");
-  Serial.println(rcfg->ident[0][2]);
-  // Serial.print("First magnet found at: ");
-  // Serial.print(firstMagnetIdx[0]);
-  // Serial.print(", ");
-  // Serial.println(firstMagnetIdx[1]);
-
-
+    Serial.println("Identification finished!");
+    Serial.print("Rotor number: ");
+    Serial.println(rcfg->ident[0][0], BIN);
+    Serial.print("Start Letter: ");
+    Serial.println(letter);
+    Serial.print("Stellung: ");
+    Serial.println(rcfg->ident[0][2]);
+  #endif
 
   return(true);
 }

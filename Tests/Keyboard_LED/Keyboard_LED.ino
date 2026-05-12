@@ -22,19 +22,19 @@
  * ─────────────────────────────────────────────── */
 
 /* Keyboard matrix — ROW pins */
-#define PIN_ROW0 1
-#define PIN_ROW1 3
-#define PIN_ROW2 28
-#define PIN_ROW3 19
-#define PIN_ROW4 26
-#define PIN_ROW5 21
+#define ROW0_PIN 1
+#define ROW1_PIN 3
+#define ROW2_PIN 28
+#define ROW3_PIN 19
+#define ROW4_PIN 26
+#define ROW5_PIN 21
 
 /* Keyboard matrix — COL pins */
-#define PIN_COL0 20
-#define PIN_COL1 22
-#define PIN_COL2 27
-#define PIN_COL3 2
-#define PIN_COL4 0
+#define COL0_PIN 20
+#define COL1_PIN 22
+#define COL2_PIN 27
+#define COL3_PIN 2
+#define COL4_PIN 0
 
 /* WS2812B data pin */
 /* NOTE: PIN_LED est réservé par le package arduino-pico (GPIO25), on utilise LED_DATA_PIN */
@@ -54,10 +54,10 @@
 Adafruit_NeoPixel leds(NUM_LEDS, LED_DATA_PIN, NEO_GRB + NEO_KHZ800);
 
 const uint8_t row_pins[NUM_ROWS] = {
-    PIN_ROW0, PIN_ROW1, PIN_ROW2, PIN_ROW3, PIN_ROW4, PIN_ROW5};
+    ROW0_PIN, ROW1_PIN, ROW2_PIN, ROW3_PIN, ROW4_PIN, ROW5_PIN};
 
 const uint8_t col_pins[NUM_COLS] = {
-    PIN_COL0, PIN_COL1, PIN_COL2, PIN_COL3, PIN_COL4};
+    COL0_PIN, COL1_PIN, COL2_PIN, COL3_PIN, COL4_PIN};
 
 /*
  * key index = row * NUM_COLS + col
@@ -71,7 +71,7 @@ const uint8_t col_pins[NUM_COLS] = {
  *   ROW5: N M [backspace] [space] [invalid]
  *
  * key_to_led[index] gives the LED index to light.
- * Invalid/special keys map to -1.
+ * Invalid keys map to -1.
  */
 const int8_t key_to_led[NUM_KEYS] = {
     /* ROW0 */ 0, 1, 2, 3, 4,
@@ -79,7 +79,7 @@ const int8_t key_to_led[NUM_KEYS] = {
     /* ROW2 */ 19, 20, 21, 22, 23,
     /* ROW3 */ 5, 6, 7, 8, 9,
     /* ROW4 */ 13, 12, 11, 10, -1,
-    /* ROW5 */ 24, 25, -1, -1, -1};
+    /* ROW5 */ 24, 25, 26, 27, -1};
 
 /* ───────────────────────────────────────────────
  * FUNCTION: readKeyboard
