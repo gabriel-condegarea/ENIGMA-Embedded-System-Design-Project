@@ -132,8 +132,6 @@ bool rotorID(RotorHardware_t* rcfg)
   uint8_t digit = 0;
 
 
-
-  
   //Offset half a letter
   //set direction
   ALLROTORS digitalWrite(rcfg->dirPins[r], rcfg->directions[r]);
