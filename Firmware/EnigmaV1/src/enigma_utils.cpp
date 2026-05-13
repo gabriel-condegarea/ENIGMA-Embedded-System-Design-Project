@@ -1,6 +1,8 @@
 #include "enigma_utils.h"
 
 
+extern uint32_t ui32_msCounter;
+
 /* Keyboard Utilities */
 const uint8_t row_pins[NUM_ROWS] = {
     ROW0_PIN, ROW1_PIN, ROW2_PIN, ROW3_PIN, ROW4_PIN, ROW5_PIN};
@@ -76,7 +78,7 @@ int8_t readKeyboard(void)
  * to the given key index.
  * Invalid/special keys do not light any LED.
  * ─────────────────────────────────────────────── */
-void sendLED(uint8_t index, Adafruit_NeoPixel* leds)
+void sendLED(uint8_t index, Adafruit_NeoPixel* leds, uint8_t r, uint8_t g, uint8_t b)
 {
     leds->clear();
 
@@ -86,11 +88,71 @@ void sendLED(uint8_t index, Adafruit_NeoPixel* leds)
 
         if (led_index >= 0 && led_index < NUM_LEDS)
         {
-            leds->setPixelColor(led_index, leds->Color(255, 200, 50));
+            leds->setPixelColor(led_index, leds->Color(r, g, b));
         }
     }
 
     leds->show();
+}
+
+/* ───────────────────────────────────────────────
+ * FUNCTION: configKeyboardPins
+ *
+ * Configures the pins used for keyboard operation
+ * ─────────────────────────────────────────────── */
+void configKeyboardPins(void)
+{
+  uint8_t col = 0, row = 0;
+
+  /* Columns as input pull-up */
+  for (col = 0; col < NUM_COLS; col++)
+  {
+    pinMode(col_pins[col], INPUT_PULLUP);
+  }
+
+  /* Rows idle as input (high impedance) */
+  for (row = 0; row < NUM_ROWS; row++)
+  {
+    pinMode(row_pins[row], INPUT);
+  }
+}
+
+
+/* ───────────────────────────────────────────────
+ * FUNCTION: initLEDS
+ * ─────────────────────────────────────────────── */
+bool initLEDS(Adafruit_NeoPixel* leds)
+{
+  if(!leds->begin()) return(false);
+  leds->setBrightness(80);
+  leds->clear();
+  leds->show();
+
+  return(true);
+}
+
+
+/* ───────────────────────────────────────────────
+ * FUNCTION: configIOEX
+ * ─────────────────────────────────────────────── */
+bool configIOEX(TwoWire* wireInt, PCA9555* io0, PCA9555* io1)
+{
+  bool status = true;
+  //config I2C pins
+  status &= wireInt->setSCL(I2C_SCL_PIN); 
+  status &= wireInt->setSDA(I2C_SDA_PIN);
+  wireInt->begin();
+
+  //IO Expander config
+  io0->attach(*wireInt, 0x20);
+  io0->polarity(PCA95x5::Polarity::ORIGINAL_ALL);
+  io0->direction(PCA95x5::Direction::IN_ALL);     
+
+  io1->attach(*wireInt, 0x21);
+  io1->polarity(PCA95x5::Polarity::ORIGINAL_ALL);
+  io1->direction(PCA95x5::Direction::IN_ALL);
+
+  return(status);
 }
 
 
@@ -126,7 +188,7 @@ bool configRotorsPins(RotorHardware_t* rcfg)
  * rotor#, stellung and start position for each 
  * rotor. Returns false if error.
  * ─────────────────────────────────────────────── */
-bool rotorID(RotorHardware_t* rcfg)
+bool rotorID(RotorHardware_t* rcfg, Adafruit_MCP3008* adc)
 {
   if(rcfg == NULL) return(false);
   
@@ -162,8 +224,8 @@ bool rotorID(RotorHardware_t* rcfg)
       ALLROTORS
       {
         digitalWrite(rcfg->stepPins[r], 1);
-        //magnetData[r][0][l] += analogRead(sensors[r][0]);   //TODO replace with MCP3008 ADC
-        //magnetData[r][1][l] += analogRead(sensors[r][1]);
+        magnetData[r][0][l] += adc->readADC(2*r);  
+        magnetData[r][1][l] += adc->readADC(2*r+1);        
       } 
       delay(4);
       ALLROTORS digitalWrite(rcfg->stepPins[r], 0);
@@ -311,13 +373,13 @@ bool rotorID(RotorHardware_t* rcfg)
 }
 
 
-
+/************* Function moveAllRotors ***************
+ * Moves all the rotors to match the software 
+ * position
+*/
 bool moveAllRotors(struct Enigma *machine, RotorHardware_t* rcfg)
 {
-  //for each rotor
-  //check if it's real position is the same as software position
-  //if not, move in the correct direction
-
+  //local vars
   uint8_t r = 0, i = 0, m = 0;
   uint8_t ui8_move = 0;
   int8_t deltaPos[NUMROTORS] = {0};
@@ -326,25 +388,42 @@ bool moveAllRotors(struct Enigma *machine, RotorHardware_t* rcfg)
   ALLROTORS
   {
     deltaPos[r] = machine->rotors[r].offset - machine->rotors[r].realPos; //compute offset
+
+    //TODO maybe correct for shortest move direction depending on deltaPos
+    
     if(deltaPos[r] != 0)  //move needed
     {
-      ui8_move >= deltaPos[r] ? ui8_move : deltaPos[r]; //find maximum number of moves
+      digitalWrite(rcfg->dirPins[r], deltaPos[r] >= 0 ? rcfg->directions[r] : !rcfg->directions[r]);
+      deltaPos[r] <0 ? -deltaPos[r] : deltaPos[r];  //compute absolute value 
+      ui8_move >= deltaPos[r] ? ui8_move : deltaPos[r]; //find maximum number of moves for all rotors
     } 
   } 
 
-  for(m = 0; m<ui8_move; m++) //a move is needed
+  for(m = 0; m<ui8_move; m++) //for the max # of moves
   {
-    //set direction depending on move direction
-    ALLROTORS digitalWrite(rcfg->dirPins[r], deltaPos[r] > 0 ? rcfg->directions[r] : ! rcfg->directions[r]);
-
-    for(i = 0; i<(rcfg->numSteps); i++) //advance a lettre
+    for(i = 0; i<(rcfg->numSteps); i++) //advance a lettre if needed
     {
       ALLROTORS  if(deltaPos[r] != 0) digitalWrite(rcfg->stepPins[r], 1);
       delay(5);
       ALLROTORS if(deltaPos[r] != 0) digitalWrite(rcfg->stepPins[r], 0);
     }
 
-    ALLROTORS deltaPos[r]--;
+    ALLROTORS deltaPos[r]--;  //decrement # of moves
   }
+
+  ALLROTORS
+  {
+    digitalWrite(rcfg->dirPins[r], rcfg->directions[r]);  //set normal direction
+    machine->rotors[r].realPos = machine->rotors[r].offset; //match position
+  }
+
+  return(true);
+}
+
+
+//Timer handler
+bool timerHandlerMillis(struct repeating_timer *t)
+{
+  ui32_msCounter++;
   return(true);
 }

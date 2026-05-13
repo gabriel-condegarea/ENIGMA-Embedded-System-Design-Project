@@ -64,7 +64,7 @@ uint8_t swiNow = 1, swiOld = 1;
 uint8_t torque = 1;
 uint16_t timer = 0;
 
-char alphabet[27] = {"ABCDEFGHIJKLMNOPQRSTUVWXYZ"};
+// char alphabet[27] = {"ABCDEFGHIJKLMNOPQRSTUVWXYZ"};
 
 void loop() 
 { 
