@@ -12,6 +12,7 @@
 
 
 #include "enigma_cipher.h"
+#include "PlugboardScanner.h"
 
 /* Constants and configuration */
 //Config

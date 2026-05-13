@@ -59,6 +59,7 @@ void setup()
       Serial.println("Error initalising PC9555");
     #endif
   }
+  initPlugboardScanner(); //init plugboard
 
   //Timer
   if(!ITimer.attachInterruptInterval(1000, timerHandlerMillis))
@@ -115,6 +116,9 @@ void loop()
 
     letterIndex_Old = letterIndex;
 
+    //Plugboard update
+    scannerPlugboard();
+
 
     /* FSM */
     switch(CurrentState)
@@ -126,6 +130,10 @@ void loop()
       */
       case STATE_STARTUP:
         //display HEIG
+        for(int i = 0; i<4; i++)
+        {
+          sendLED(1)
+        }
 
         //create and init machine structure
         machine.reflector = reflectors[1];  //configure reflectors

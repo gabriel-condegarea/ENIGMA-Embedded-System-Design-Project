@@ -27,7 +27,7 @@ const char *reflectors[] = {
 
 const char *rotor_names[] = {"I", "II", "III", "IV", "V", "VI", "VII", "VIII"};  //rotor roman numerals
 
-const char *plugboard = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";  
+char plugboard[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";  
 
 
 // extern uint8_t opt_debug;
