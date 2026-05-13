@@ -9,8 +9,6 @@
 //   Avec A <-> G  : GBCDEFAHIJKLMNOPQRSTUVWXYZ
 // ============================================================================
 
-// __--__--__ Version intégrable dans EnigmaV1 avec le .h
-
 #include "PlugboardScanner.h"
 
 #include <Arduino.h>
@@ -63,7 +61,8 @@ static LettrePin lettres[] = {
 static const uint8_t NB_LETTRES = sizeof(lettres) / sizeof(lettres[0]);
 
 // 26 lettres + caractère de fin '\0'
-static char plugboardString[27];
+// Variable globale accessible depuis les autres fichiers via le .h
+char plugboardString[27] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 // ---------------------------------------------------------------------------
 // Initialise la string du plugboard
@@ -205,14 +204,6 @@ void scannerPlugboard()
     }
 
     toutEnEntree();
-}
-
-// ---------------------------------------------------------------------------
-// Retourne la string actuelle du plugboard
-// ---------------------------------------------------------------------------
-const char *getPlugboardString()
-{
-    return plugboardString;
 }
 
 // ---------------------------------------------------------------------------
