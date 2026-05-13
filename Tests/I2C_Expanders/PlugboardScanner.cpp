@@ -1,25 +1,25 @@
 // ============================================================================
-// ENIGMA Project - Plugboard Scanner with PCA9555
+// ENIGMA Project - Plugboard Scanner
 // ============================================================================
-// Rôle :
-//   Scanner automatiquement les connexions du plugboard.
-//   Générer une string de substitution de type :
-//   "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+// Module chargé de scanner les connexions physiques du plugboard
+// et de générer une string de substitution de 26 lettres.
 //
 // Exemple :
-//   Sans câble      : ABCDEFGHIJKLMNOPQRSTUVWXYZ
-//   Avec A <-> G   : GBCDEFAHIJKLMNOPQRSTUVWXYZ
-//   Avec A <-> G,
-//        B <-> T   : GTCDEFAHIJKLMNOPQRSBUVWXYZ
+//   Sans connexion : ABCDEFGHIJKLMNOPQRSTUVWXYZ
+//   Avec A <-> G  : GBCDEFAHIJKLMNOPQRSTUVWXYZ
 // ============================================================================
 
-//__--__--__ Version testable seule dans Arduino IDE
+// __--__--__ Version intégrable dans EnigmaV1 avec le .h
 
-#include <Wire.h>
+#include "PlugboardScanner.h"
+
+#include <Arduino.h>
 #include <PCA95x5.h>
 
-PCA9555 ioex0; // K7 - Adresse I2C 0x20
-PCA9555 ioex1; // K8 - Adresse I2C 0x21
+// Les objets PCA9555 sont déclarés et initialisés ailleurs
+// dans le programme principal.
+extern PCA9555 ioex0; // K7 - Adresse I2C 0x20
+extern PCA9555 ioex1; // K8 - Adresse I2C 0x21
 
 struct LettrePin
 {
@@ -29,7 +29,7 @@ struct LettrePin
 };
 
 // Mapping selon le schéma KiCad
-LettrePin lettres[] = {
+static LettrePin lettres[] = {
     // K7 / PCA9555 adresse 0x20
     {'Q', 0, 0},
     {'A', 0, 1},
@@ -60,15 +60,15 @@ LettrePin lettres[] = {
     {'L', 1, 8},
     {'P', 1, 9}};
 
-const uint8_t NB_LETTRES = sizeof(lettres) / sizeof(lettres[0]);
+static const uint8_t NB_LETTRES = sizeof(lettres) / sizeof(lettres[0]);
 
 // 26 lettres + caractère de fin '\0'
-char plugboardString[27];
+static char plugboardString[27];
 
 // ---------------------------------------------------------------------------
 // Initialise la string du plugboard
 // ---------------------------------------------------------------------------
-void initialiserPlugboard()
+static void initialiserPlugboard()
 {
     for (uint8_t i = 0; i < 26; i++)
     {
@@ -81,7 +81,7 @@ void initialiserPlugboard()
 // ---------------------------------------------------------------------------
 // Lie deux lettres dans la string du plugboard
 // ---------------------------------------------------------------------------
-void lierLettres(char a, char b)
+static void lierLettres(char a, char b)
 {
     if (a < 'A' || a > 'Z' || b < 'A' || b > 'Z')
     {
@@ -93,22 +93,9 @@ void lierLettres(char a, char b)
 }
 
 // ---------------------------------------------------------------------------
-// Applique la substitution du plugboard à une lettre
-// ---------------------------------------------------------------------------
-char appliquerPlugboard(char lettre)
-{
-    if (lettre < 'A' || lettre > 'Z')
-    {
-        return lettre;
-    }
-
-    return plugboardString[lettre - 'A'];
-}
-
-// ---------------------------------------------------------------------------
 // Met toutes les pins des deux PCA9555 en entrée
 // ---------------------------------------------------------------------------
-void toutEnEntree()
+static void toutEnEntree()
 {
     ioex0.direction(0xFFFF);
     ioex1.direction(0xFFFF);
@@ -118,7 +105,7 @@ void toutEnEntree()
 // Prépare toutes les sorties à LOW
 // Les pins ne forcent rien tant qu'elles restent configurées en entrée.
 // ---------------------------------------------------------------------------
-void preparerSortiesLow()
+static void preparerSortiesLow()
 {
     ioex0.write(0x0000);
     ioex1.write(0x0000);
@@ -128,7 +115,7 @@ void preparerSortiesLow()
 // Met une seule lettre en sortie LOW
 // Toutes les autres lettres restent en entrée.
 // ---------------------------------------------------------------------------
-void activerLettreLow(uint8_t index)
+static void activerLettreLow(uint8_t index)
 {
     uint16_t dir0 = 0xFFFF;
     uint16_t dir1 = 0xFFFF;
@@ -156,7 +143,7 @@ void activerLettreLow(uint8_t index)
 // ---------------------------------------------------------------------------
 // Retourne true si la lettre donnée est lue à LOW
 // ---------------------------------------------------------------------------
-bool lettreEstLow(uint8_t index, uint16_t etat0, uint16_t etat1)
+static bool lettreEstLow(uint8_t index, uint16_t etat0, uint16_t etat1)
 {
     uint8_t chip = lettres[index].chip;
     uint8_t bit = lettres[index].bit;
@@ -167,6 +154,16 @@ bool lettreEstLow(uint8_t index, uint16_t etat0, uint16_t etat1)
     }
 
     return ((etat1 >> bit) & 1) == 0;
+}
+
+// ---------------------------------------------------------------------------
+// Initialise le module plugboard
+// À appeler après l'initialisation I2C et après l'initialisation des PCA9555.
+// ---------------------------------------------------------------------------
+void initPlugboardScanner()
+{
+    toutEnEntree();
+    initialiserPlugboard();
 }
 
 // ---------------------------------------------------------------------------
@@ -211,45 +208,22 @@ void scannerPlugboard()
 }
 
 // ---------------------------------------------------------------------------
-// Setup
+// Retourne la string actuelle du plugboard
 // ---------------------------------------------------------------------------
-void setup()
+const char *getPlugboardString()
 {
-    Serial.begin(115200);
-    delay(2000);
-
-    Serial.println("=== ENIGMA - Plugboard Scanner PCA9555 ===");
-
-    // I2C sur Wire1 avec les pins du Raspberry Pi Pico
-    Wire1.setSCL(15);
-    Wire1.setSDA(14);
-    Wire1.begin();
-
-    // PCA9555 K7
-    ioex0.attach(Wire1, 0x20);
-    ioex0.polarity(PCA95x5::Polarity::ORIGINAL_ALL);
-    ioex0.direction(PCA95x5::Direction::IN_ALL);
-
-    // PCA9555 K8
-    ioex1.attach(Wire1, 0x21);
-    ioex1.polarity(PCA95x5::Polarity::ORIGINAL_ALL);
-    ioex1.direction(PCA95x5::Direction::IN_ALL);
-
-    toutEnEntree();
-    initialiserPlugboard();
-
-    Serial.println("Initialisation terminee.");
+    return plugboardString;
 }
 
 // ---------------------------------------------------------------------------
-// Loop
+// Applique la substitution du plugboard à une lettre
 // ---------------------------------------------------------------------------
-void loop()
+char applyPlugboard(char lettre)
 {
-    scannerPlugboard();
+    if (lettre < 'A' || lettre > 'Z')
+    {
+        return lettre;
+    }
 
-    Serial.print("Plugboard : ");
-    Serial.println(plugboardString);
-
-    delay(1000);
+    return plugboardString[lettre - 'A'];
 }
