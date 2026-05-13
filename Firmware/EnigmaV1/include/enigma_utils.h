@@ -1,23 +1,35 @@
 #pragma once
 #include <Arduino.h>
+#include <Wire.h>
+
 #include <Adafruit_NeoPixel.h>
+#include <Adafruit_MCP3008.h>
+#include <PCA95x5.h>
+
+//timers
+#include <RPi_Pico_TimerInterrupt.h>
+#include <RPi_Pico_ISR_Timer.hpp>
+
 
 #include "enigma_cipher.h"
 
 /* Constants and configuration */
 //Config
+/* Parameters */
+#define MAG_THR 15 //threshold for magnet detection
+#define IDENT_DELAY 3000 //delay for anormal ident order
 #define SERIALDEBUG 1
 
 //State machine states
-#define STATE_STARTUP 0
-#define STATE_STANDBY 1
-#define STATE_SYSTEM_ID 2
-#define STATE_OPERATION 3
+typedef enum States {STATE_STARTUP, STATE_ROTOR_SEL, STATE_POS_SEL, STATE_SYSTEM_ID, STATE_OPERATION, STATE_ERROR}States;
 
 
-//Sensor
-#define MAG_THR 15 //threshold for magnet detection
 
+
+
+
+
+/* Constants */
 //Keyboard 
 #define NUM_ROWS 6
 #define NUM_COLS 5
@@ -43,25 +55,21 @@ typedef struct RotorHardware_t
 }RotorHardware_t;
 
 /* Function prototypes */
+//Keyboard / LED
 int8_t readKeyboard(void);
-void sendLED(uint8_t index, Adafruit_NeoPixel* leds);
+void sendLED(uint8_t index, Adafruit_NeoPixel* leds, uint8_t r, uint8_t g, uint8_t b);
+void configKeyboardPins(void);
+bool initLEDS(Adafruit_NeoPixel* leds);
+
+//plugboard
+bool configIOEX(TwoWire* Wire, PCA9555* io0, PCA9555* io1);
+
+//Rotors
 bool configRotorsPins(RotorHardware_t* rcfg);
-bool rotorID(RotorHardware_t* rcfg);
+bool rotorID(RotorHardware_t* rcfg, Adafruit_MCP3008* adc);
 bool moveAllRotors(struct Enigma *machine, RotorHardware_t* rcfg);
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+bool timerHandlerMillis(struct repeating_timer *t);
 
 
 /* Hardware definitions */
