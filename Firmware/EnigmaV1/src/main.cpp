@@ -29,6 +29,8 @@ void setup()
     Serial.begin(115200);
   #endif
 
+  Keyboard.begin(); //USB-HID device
+
   bool status = true;
 
   //hardware config
@@ -85,16 +87,22 @@ void loop()
   //local vars
   //cipher
   struct Enigma machine = {}; // initialized to defaults
-  int8_t i, character, index;
+  int8_t i;
+  char character;
   uint8_t r;
 
   uint8_t swiBig = 1, swiSmall = 1; //limit switches detection
+
+  uint8_t ui8_identCounter = 0; //number of ident counter
 
   //Keypress detection
   int8_t letterIndex = -1, letterIndex_Old = -1;
   uint8_t newPress = 0;
 
   bool b_identValid = false;
+
+  //start animation
+  char letterSequence[7] = {"HEIGVD"};
 
   //timing
   uint32_t ui32_identStartTime = 0;
@@ -129,13 +137,14 @@ void loop()
        * Exit condition: Init finished
       */
       case STATE_STARTUP:
-        //display HEIG
+        //display HEIG text
         for(int i = 0; i<4; i++)
         {
-          sendLED(1)
+          sendLED(letterSequence[i], &LED, 255,0,0);  //write letter
+          delay(1000);
         }
 
-        //create and init machine structure
+        //init machine structure
         machine.reflector = reflectors[1];  //configure reflectors
 
         //exit logic:
@@ -193,21 +202,43 @@ void loop()
 
           if(b_identValid)  //identification OK
           {
-            
+            //configure rotors 
             for(r = 0; r<rotorConfig.numRotors; r++)  //all rotors
             {
               machine.rotors[0] = new_rotor(&machine, rotorConfig.ident[r][0], 
                                                       rotorConfig.ident[r][1], 
                                                       rotorConfig.ident[r][2]);
-            }
 
+              #if SERIALDEBUG
+                Serial.println("Initial position: ");
+                //Possible to add a way to print stellung
+                printPosition(Serial, &machine);
+                
+              #endif
+            } 
           }
+          else ui8_identCounter++;
+
+          //if ident fails twice
+          if(ui8_identCounter <= 2) CurrentState = STATE_ERROR; 
         }
 
         //exit conditions
-        if(swiBig == 1) CurrentState = STATE_ROTOR_SEL; //big lid open
-        else if(swiSmall == 1) CurrentState = STATE_POS_SEL;  //small lid open
-
+        if(swiBig == 1)
+        {
+          CurrentState = STATE_ROTOR_SEL; //big lid open
+          ui8_identCounter = 0; //reset counter
+        } 
+        else if(swiSmall == 1)
+        {
+          CurrentState = STATE_POS_SEL;  //small lid open
+          ui8_identCounter = 0; //reset counter
+        } 
+        else if(b_identValid)
+        {
+          CurrentState = STATE_OPERATION;  //Ident OK
+          ui8_identCounter = 0; //reset counter
+        } 
       break;
 
       /************************OPERATION***********************
@@ -218,7 +249,53 @@ void loop()
       */
       case STATE_OPERATION:
         //copy logic from Tests/Algorithmes
+        
+        if(newPress)  //new key press
+        {
+          newPress = 0; //rst flag
+          switch(letterIndex)
+          {
+            case -1:  //error case
+              //TODO error 
+              break;
+            case 25: //backspace
+              //TODO backspace
+                //send to USB
+                Keyboard.write(8);
+                //move back one move
+              break;
+            case 26: 
+                //send to USB
+                Keyboard.write(32); 
+              break;
+            default:  //normal letter
+              character = alpha[letterIndex];
+              #if SERIALDEBUG
+                Serial.print("Input letter is ");
+                Serial.println(character);
+              #endif
 
+              //rotors cycling
+              cycleAllRotors(&machine);    
+              moveAllRotors(&machine, &rotorConfig);  //physically move rotors
+
+              #if SERIALDEBUG
+                Serial.println("Position after cycling:");
+                printPosition(Serial, &machine);
+              #endif
+
+              character = enigma_encrypt(&machine, character);
+
+              #if SERIALDEBUG
+                Serial.print("Output letter is ");
+                Serial.println(character);
+              #endif
+
+              //send via USB
+              Keyboard.write(character);
+              break;
+          }
+        }
         //exit conditions
         if(swiBig == 1) CurrentState = STATE_ROTOR_SEL; //big lid open
         else if(swiSmall == 1) CurrentState = STATE_POS_SEL;  //small lid open
@@ -230,6 +307,7 @@ void loop()
       */
       case STATE_ERROR:
         sendLED(5, &LED, 255,0,0);  //RED E
+        delay(1000);
         //exit conditions
         //None
       break;      

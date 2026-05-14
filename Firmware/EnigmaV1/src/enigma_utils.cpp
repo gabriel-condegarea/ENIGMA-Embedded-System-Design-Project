@@ -9,53 +9,18 @@ const uint8_t row_pins[NUM_ROWS] = {
 const uint8_t col_pins[NUM_COLS] = {
     COL0_PIN, COL1_PIN, COL2_PIN, COL3_PIN, COL4_PIN};
 
-// /*
-//  * key index = row * NUM_COLS + col
-//  *
-//  * Keyboard layout:
-//  *   ROW0: Q W E R T
-//  *   ROW1: A S D F G
-//  *   ROW2: Y X C V B
-//  *   ROW3: Z U I O P
-//  *   ROW4: H J K L [invalid]
-//  *   ROW5: N M [backspace] [space] [invalid]
-//  *
-//  * key_to_led[index] gives the LED index to light.
-//  * Invalid keys map to -1.
-//  */
-// const int8_t key_to_led[NUM_KEYS] = {
-//     /* ROW0 */ 0, 1, 2, 3, 4,
-//     /* ROW1 */ 18, 17, 16, 15, 14,
-//     /* ROW2 */ 19, 20, 21, 22, 23,
-//     /* ROW3 */ 5, 6, 7, 8, 9,
-//     /* ROW4 */ 13, 12, 11, 10, -1,
-//     /* ROW5 */ 24, 25, -1, -1, -1};
 
-// TODO: JE TE LAISSE VERIFIER SI C'EST OK POUR TOI
-
-/*
- * key index = row * NUM_COLS + col
- *
- * Keyboard layout:
- *   ROW0: Q W E R T
- *   ROW1: A S D F G
- *   ROW2: Y X C V B
- *   ROW3: Z U I O P
- *   ROW4: H J K L [invalid]
- *   ROW5: N M [backspace] [space] [invalid]
- *
- * key_to_alpha[index] gives the alphabet index:
- *   A = 0, B = 1, ..., Z = 25
- *
- * Invalid/special keys map to -1.
- */
+//convert key pressed to letter
 const int8_t key_to_alpha[NUM_KEYS] = {
     /* ROW0: Q W E R T */ 16, 22, 4, 17, 19,
     /* ROW1: A S D F G */ 0, 18, 3, 5, 6,
     /* ROW2: Y X C V B */ 24, 23, 2, 21, 1,
     /* ROW3: Z U I O P */ 25, 20, 8, 14, 15,
     /* ROW4: H J K L invalid */ 7, 9, 10, 11, -1,
-    /* ROW5: N M backspace space invalid */ 13, 12, -1, -1, -1};
+    /* ROW5: N M backspace space invalid */ 13, 12, 26, 27, -1};
+
+//convert lettre to LED index
+const uint8_t alpha_to_LED[NUM_LEDS] = {18,23,21,16,2,15,14,13,7,12,11,10,25,24,8,9,0,3,17,4,6,22,1,20,19,5};
 
 /* ───────────────────────────────────────────────
  * FUNCTION: readKeyboard
@@ -64,6 +29,7 @@ const int8_t key_to_alpha[NUM_KEYS] = {
  * Returns:
  * -1 if no valid letter key is pressed
  * alphabet index 0..25 if a valid letter key is pressed
+ * 26, 27 for backspace and space
  * ─────────────────────────────────────────────── */
 int8_t readKeyboard(void)
 {
@@ -107,33 +73,21 @@ int8_t readKeyboard(void)
  *   sendLED(1)  -> lights B
  *   sendLED(25) -> lights Z
  * ─────────────────────────────────────────────── */
-// void sendLED(uint8_t index, Adafruit_NeoPixel *leds, uint8_t r, uint8_t g, uint8_t b)
-// {
-//   leds->clear();
 
-//   if (index < NUM_KEYS)
-//   {
-//     int8_t led_index = key_to_led[index];
-
-//     if (led_index >= 0 && led_index < NUM_LEDS)
-//     {
-//       leds->setPixelColor(led_index, leds->Color(r, g, b));
-//     }
-//   }
-
-//   leds->show();
-// }
-
-// TODO: VERIFIE SI C'EST OK POUR TOI
-
-void sendLED(uint8_t letter_index, Adafruit_NeoPixel *leds, uint8_t r, uint8_t g, uint8_t b)
+void sendLED(uint8_t letter, Adafruit_NeoPixel *leds, uint8_t r, uint8_t g, uint8_t b)
 {
+  uint8_t index = 0;
   leds->clear();
 
-  if (letter_index < NUM_LEDS)
+  if((letter>= 'A') && (letter <= 'Z')) //support alpha input
   {
-    leds->setPixelColor(letter_index, leds->Color(r, g, b));
+    letter -= 'A';  //A maps to 0
   }
+  else if (letter > 26) return; //invalid letter
+
+  index = alpha_to_LED[letter];
+
+  if (index < NUM_LEDS) leds->setPixelColor(index, leds->Color(r, g, b));
 
   leds->show();
 }
@@ -428,18 +382,20 @@ bool moveAllRotors(struct Enigma *machine, RotorHardware_t *rcfg)
 
   ALLROTORS
   {
-    deltaPos[r] = machine->rotors[r].offset - machine->rotors[r].realPos; // compute offset
+    deltaPos[r] = (26 + machine->rotors[r].offset - machine->rotors[r].realPos) %26; // compute offset, correct sign
 
-    // TODO maybe correct for shortest move direction depending on deltaPos
+    // during operation machine should only move in the normal direction
 
     if (deltaPos[r] != 0) // move needed
     {
-      digitalWrite(rcfg->dirPins[r], deltaPos[r] >= 0 ? rcfg->directions[r] : !rcfg->directions[r]);
+      digitalWrite(rcfg->dirPins[r], deltaPos[r] >= 0 ? rcfg->directions[r] : !rcfg->directions[r]);  //write direction
       deltaPos[r] < 0 ? -deltaPos[r] : deltaPos[r];     // compute absolute value
       ui8_move >= deltaPos[r] ? ui8_move : deltaPos[r]; // find maximum number of moves for all rotors
     }
   }
 
+  //TODO:Advanced : if rotor ends up on 'A', home using strongest magnet position
+  //that would be dope but a bit hard maybe
   for (m = 0; m < ui8_move; m++) // for the max # of moves
   {
     for (i = 0; i < (rcfg->numSteps); i++) // advance a lettre if needed
@@ -455,7 +411,7 @@ bool moveAllRotors(struct Enigma *machine, RotorHardware_t *rcfg)
   ALLROTORS
   {
     digitalWrite(rcfg->dirPins[r], rcfg->directions[r]);    // set normal direction
-    machine->rotors[r].realPos = machine->rotors[r].offset; // match position
+    machine->rotors[r].realPos = machine->rotors[r].offset; // update position variable
   }
 
   return (true);
@@ -466,4 +422,18 @@ bool timerHandlerMillis(struct repeating_timer *t)
 {
   ui32_msCounter++;
   return (true);
+}
+
+//helper function, print current position through serial
+void printPosition(SerialUSB Serial, struct Enigma* machine)
+{
+  const char* alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"; 
+
+  char buf[50] = {0};
+
+  sprintf(buf, "|%s|%s|%s|\n| %c | %c | %c |",
+                machine->rotors[2].name, machine->rotors[1].name, machine->rotors[0].name,
+                alphabet[machine->rotors[2].offset],alphabet[machine->rotors[1].offset],alphabet[machine->rotors[0].offset] );
+
+  Serial.println(buf);
 }

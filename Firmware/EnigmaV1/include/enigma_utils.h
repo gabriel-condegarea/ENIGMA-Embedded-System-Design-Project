@@ -6,6 +6,9 @@
 #include <Adafruit_MCP3008.h>
 #include <PCA95x5.h>
 
+//Keyboard function
+#include <Keyboard.h>
+
 //timers
 #include <RPi_Pico_TimerInterrupt.h>
 #include <RPi_Pico_ISR_Timer.hpp>
@@ -23,11 +26,6 @@
 
 //State machine states
 typedef enum States {STATE_STARTUP, STATE_ROTOR_SEL, STATE_POS_SEL, STATE_SYSTEM_ID, STATE_OPERATION, STATE_ERROR}States;
-
-
-
-
-
 
 
 /* Constants */
@@ -71,6 +69,8 @@ bool rotorID(RotorHardware_t* rcfg, Adafruit_MCP3008* adc);
 bool moveAllRotors(struct Enigma *machine, RotorHardware_t* rcfg);
 
 bool timerHandlerMillis(struct repeating_timer *t);
+
+void printPosition(SerialUSB Serial, struct Enigma* machine);
 
 
 /* Hardware definitions */

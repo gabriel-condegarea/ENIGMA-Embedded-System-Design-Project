@@ -115,7 +115,7 @@ uint8_t rotor_reverse(struct Rotor *rotor, uint8_t index)
     return index;
 }
 
-uint8_t cycleAllRotors(struct Enigma *machine, uint8_t inChar)
+uint8_t cycleAllRotors(struct Enigma *machine)
 {
     //local vars
     uint8_t i = 0, outChar = 0;
