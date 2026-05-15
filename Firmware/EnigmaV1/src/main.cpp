@@ -85,27 +85,34 @@ void setup()
 void loop() 
 {
   //local vars
-  //cipher
-  struct Enigma machine = {}; // initialized to defaults
-  int8_t i;
-  char character;
-  uint8_t r;
 
+  //hardware
   uint8_t swiBig = 1, swiSmall = 1; //limit switches detection
-
-  uint8_t ui8_identCounter = 0; //number of ident counter
-
   //Keypress detection
   int8_t letterIndex = -1, letterIndex_Old = -1;
   uint8_t newPress = 0;
+  
+  
+  //cipher
+  struct Enigma machine = {}; // initialized to defaults
+  char character;
 
+  uint16_t histPointer = 0;  //number of rotor moves
+  uint8_t availBackspace = 0;  //number of subsequent backspaces available
+  uint8_t posHistory[HIST_BUFSIZE][3] = {0};
+
+  uint8_t r, i; //loop operators
+
+  //rotor ID
   bool b_identValid = false;
+  uint8_t ui8_identCounter = 0; //number of ident counter
 
   //start animation
   char letterSequence[7] = {"HEIGVD"};
 
   //timing
   uint32_t ui32_identStartTime = 0;
+  States prevState = CurrentState;
 
   //infinite loop
   while(1)
@@ -127,6 +134,17 @@ void loop()
     //Plugboard update
     scannerPlugboard();
 
+    //check for state transition
+    if(CurrentState != prevState && CurrentState != STATE_ERROR)
+    {
+      prevState = CurrentState; //update previous
+      #if SERIALDEBUG
+        Serial.print("Current state is now = ");
+        Serial.println(CurrentState);
+      #endif
+    }
+    
+
 
     /* FSM */
     switch(CurrentState)
@@ -146,6 +164,7 @@ void loop()
 
         //init machine structure
         machine.reflector = reflectors[1];  //configure reflectors
+        machine.numrotors = NUMROTORS;
 
         //exit logic:
         //both switches pressed -> directly to ID
@@ -202,12 +221,16 @@ void loop()
 
           if(b_identValid)  //identification OK
           {
+            histPointer = 0; //reset move counter
             //configure rotors 
             for(r = 0; r<rotorConfig.numRotors; r++)  //all rotors
             {
               machine.rotors[0] = new_rotor(&machine, rotorConfig.ident[r][0], 
                                                       rotorConfig.ident[r][1], 
                                                       rotorConfig.ident[r][2]);
+
+              
+              posHistory[0][r] = rotorConfig.ident[r][0];  //store initial position in buffer
 
               #if SERIALDEBUG
                 Serial.println("Initial position: ");
@@ -256,13 +279,34 @@ void loop()
           switch(letterIndex)
           {
             case -1:  //error case
-              //TODO error 
+              CurrentState = STATE_ERROR; 
+              #if SERIALDEBUG
+                Serial.println("Invalid letter");
+              #endif
               break;
             case 25: //backspace
-              //TODO backspace
-                //send to USB
-                Keyboard.write(8);
-                //move back one move
+                if(availBackspace > 0)
+                {
+                  availBackspace--;
+                  histPointer--;
+
+                  #if SERIALDEBUG
+                    Serial.print(availBackspace);
+                    Serial.println(" backspaces left");
+                  #endif
+                  //send to USB
+                  Keyboard.write(8);
+                  
+                  for(r = 0; r<machine.numrotors; r++)  //move back one move
+                  {
+                    machine.rotors[r].offset = posHistory[histPointer][r];
+                  }
+                  moveAllRotors(&machine, &rotorConfig);  //physically move rotors
+                }
+                #if SERIALDEBUG
+                  else Serial.println("Cannot delete more letters");
+                #endif
+
               break;
             case 26: 
                 //send to USB
@@ -278,6 +322,13 @@ void loop()
               //rotors cycling
               cycleAllRotors(&machine);    
               moveAllRotors(&machine, &rotorConfig);  //physically move rotors
+
+              histPointer++; //move one step in the history buffer 
+              if(availBackspace < HIST_BUFSIZE) availBackspace++; //increment delete if not maxed out
+              for(r = 0; r<machine.numrotors;r++)
+              {
+                posHistory[histPointer % HIST_BUFSIZE][r] = machine.rotors[r].offset;  //store history
+              } 
 
               #if SERIALDEBUG
                 Serial.println("Position after cycling:");
@@ -299,7 +350,6 @@ void loop()
         //exit conditions
         if(swiBig == 1) CurrentState = STATE_ROTOR_SEL; //big lid open
         else if(swiSmall == 1) CurrentState = STATE_POS_SEL;  //small lid open
-
       break;
 
       /************************ ERROR ***********************
@@ -307,11 +357,15 @@ void loop()
       */
       case STATE_ERROR:
         sendLED(5, &LED, 255,0,0);  //RED E
+        #if SERIALDEBUG
+          Serial.println("Engima has encountered an error :(");
+          Serial.print("State at the time of error: ");
+          Serial.println(prevState);
+        #endif
         delay(1000);
         //exit conditions
         //None
       break;      
-
     }
     /* End of FSM*/
     

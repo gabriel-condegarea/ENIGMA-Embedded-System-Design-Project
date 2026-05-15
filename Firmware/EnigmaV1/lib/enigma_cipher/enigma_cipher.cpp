@@ -47,7 +47,7 @@ struct Rotor new_rotor(struct Enigma *machine, uint8_t rotornumber, uint8_t offs
     r.cipher = rotor_ciphers[rotornumber - 1];
     r.turnover = rotor_turnovers[rotornumber - 1];
     r.notch = rotor_notches[rotornumber - 1];
-    machine->numrotors++;
+    //machine->numrotors++;     //probably not a great idea if we go through this multiple times
 
     return r;
 }

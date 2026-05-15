@@ -24,6 +24,8 @@
 #define IDENT_DELAY 3000 //delay for anormal ident order
 #define SERIALDEBUG 1
 
+#define HIST_BUFSIZE 15 //size of the old position buffer
+
 //State machine states
 typedef enum States {STATE_STARTUP, STATE_ROTOR_SEL, STATE_POS_SEL, STATE_SYSTEM_ID, STATE_OPERATION, STATE_ERROR}States;
 

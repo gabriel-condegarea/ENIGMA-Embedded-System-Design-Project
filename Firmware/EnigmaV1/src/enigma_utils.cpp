@@ -382,9 +382,16 @@ bool moveAllRotors(struct Enigma *machine, RotorHardware_t *rcfg)
 
   ALLROTORS
   {
-    deltaPos[r] = (26 + machine->rotors[r].offset - machine->rotors[r].realPos) %26; // compute offset, correct sign
+    deltaPos[r] = (machine->rotors[r].offset - machine->rotors[r].realPos); // compute offset, correct sign
 
     // during operation machine should only move in the normal direction
+    // unless it's a backspace, in which case up to -2 is possible 
+    // negative probably means Z-A transition
+    // other cases are rare enough to bother making them perfect.
+    if(deltaPos[r] < -2)  //not a backspace
+    {
+      deltaPos[r] += 26;  //
+    }
 
     if (deltaPos[r] != 0) // move needed
     {
