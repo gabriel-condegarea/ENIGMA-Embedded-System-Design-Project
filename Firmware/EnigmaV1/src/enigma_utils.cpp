@@ -11,7 +11,8 @@ const uint8_t col_pins[NUM_COLS] = {
 
 
 //convert key pressed to letter
-const int8_t key_to_alpha[NUM_KEYS] = {
+const int8_t key_to_alpha[NUM_KEYS] =
+{
     /* ROW0: Q W E R T */ 16, 22, 4, 17, 19,
     /* ROW1: A S D F G */ 0, 18, 3, 5, 6,
     /* ROW2: Y X C V B */ 24, 23, 2, 21, 1,
@@ -33,21 +34,23 @@ const uint8_t alpha_to_LED[NUM_LEDS] = {18,23,21,16,2,15,14,13,7,12,11,10,25,24,
  * ─────────────────────────────────────────────── */
 int8_t readKeyboard(void)
 {
-  for (uint8_t row = 0; row < NUM_ROWS; row++)
+  uint8_t read = 0;
+  for (uint8_t col = 0; col < NUM_COLS; col++)  //each collumn
   {
+
     /* Activate current row */
-    pinMode(row_pins[row], OUTPUT);
-    digitalWrite(row_pins[row], LOW);
+    digitalWrite(col_pins[col], 1);
+    // Serial.print("col ");
+    // Serial.println(col);
+    // delayMicroseconds(10);
 
-    delayMicroseconds(10);
-
-    for (uint8_t col = 0; col < NUM_COLS; col++)
-    {
-      if (digitalRead(col_pins[col]) == LOW)
+    for (uint8_t row = 0; row < NUM_ROWS; row++)  
+    { 
+      read = digitalRead(row_pins[row]);  //read value
+      if (read == 1)    //if pressed
       {
         /* Release current row before returning */
-        digitalWrite(row_pins[row], HIGH);
-        pinMode(row_pins[row], INPUT);
+        digitalWrite(col_pins[col], 0);
 
         uint8_t key_index = row * NUM_COLS + col;
         return key_to_alpha[key_index];
@@ -55,8 +58,7 @@ int8_t readKeyboard(void)
     }
 
     /* Release current row */
-    digitalWrite(row_pins[row], HIGH);
-    pinMode(row_pins[row], INPUT);
+    digitalWrite(col_pins[col], 0);
   }
 
   return -1;
@@ -74,10 +76,16 @@ int8_t readKeyboard(void)
  *   sendLED(25) -> lights Z
  * ─────────────────────────────────────────────── */
 
-void sendLED(uint8_t letter, Adafruit_NeoPixel *leds, uint8_t r, uint8_t g, uint8_t b)
+void sendLED(int8_t letter, Adafruit_NeoPixel *leds, uint8_t r, uint8_t g, uint8_t b)
 {
   uint8_t index = 0;
   leds->clear();
+
+  if(letter == -1)
+  {
+    leds->show();
+    return;   //-1 clears display
+  } 
 
   if((letter>= 'A') && (letter <= 'Z')) //support alpha input
   {
@@ -101,16 +109,16 @@ void configKeyboardPins(void)
 {
   uint8_t col = 0, row = 0;
 
-  /* Columns as input pull-up */
+  /* Columns as outputs */
   for (col = 0; col < NUM_COLS; col++)
   {
-    pinMode(col_pins[col], INPUT_PULLUP);
+    pinMode(col_pins[col], OUTPUT);
   }
 
-  /* Rows idle as input (high impedance) */
+  /* Rows as input */
   for (row = 0; row < NUM_ROWS; row++)
   {
-    pinMode(row_pins[row], INPUT);
+    pinMode(row_pins[row], INPUT_PULLDOWN);
   }
 }
 

@@ -1,6 +1,6 @@
 #include "pinout.h"
 
-#define NUMROTORS 1
+#define NUMROTORS 3 
 #define ALLROTORS for(r = 0; r < rcfg->numRotors; r++)
 
 
@@ -38,7 +38,7 @@ struct Rotor
 };
 
 
-RotorHardware_t rotorConfig = {.numRotors= NUMROTORS, .sensorOffset = 9, .numSteps = 40,.enPin = MOTOR_EN_PIN, .dirPins={DIR0_PIN, DIR1_PIN, DIR2_PIN}, .directions={0,0,0}, .stepPins={STEP0_PIN,STEP1_PIN,STEP2_PIN}};
+RotorHardware_t rotorConfig = {.numRotors= NUMROTORS, .sensorOffset = 9, .numSteps = 40,.enPin = MOTOR_EN_PIN, .dirPins={DIR2_PIN, DIR1_PIN, DIR0_PIN}, .directions={1,0,0}, .stepPins={STEP2_PIN,STEP1_PIN,STEP0_PIN}};
 
 
 void setup() 
@@ -78,6 +78,9 @@ void loop()
     else digitalWrite(MOTOR_EN_PIN, 1); //disable torque
   }
   swiOld = swiNow;
+
+  torque = 1;
+  digitalWrite(MOTOR_EN_PIN, 0);
 
   if(torque)
   {

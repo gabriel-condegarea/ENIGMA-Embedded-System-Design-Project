@@ -13,7 +13,12 @@ PCA9555 ioex1; // Adresse I2C 0x21 (K8 - Port 1: Z U J I K O L P M N H G F B T R
 RPI_PICO_Timer ITimer(0);
 
 //global vars
-RotorHardware_t rotorConfig = {.numRotors= NUMROTORS, .sensorOffset = 22, .numSteps = 40,.enPin = MOTOR_EN_PIN, .dirPins={DIR0_PIN, DIR1_PIN, DIR2_PIN}, .directions={0,0,0}, .stepPins={STEP0_PIN,STEP1_PIN,STEP2_PIN}};
+RotorHardware_t rotorConfig = {.numRotors= NUMROTORS, .sensorOffset = 22, 
+                                .numSteps = 20,.enPin = MOTOR_EN_PIN, 
+                                .dirPins={DIR2_PIN, DIR1_PIN, DIR0_PIN}, 
+                                .directions={0,0,0}, 
+                                .stepPins={STEP2_PIN,STEP1_PIN,STEP0_PIN}
+                            };
 uint32_t ui32_msCounter = 0;
 States CurrentState = STATE_STARTUP;
 
@@ -21,6 +26,7 @@ States CurrentState = STATE_STARTUP;
 extern const char *alpha;
 extern const char *reflectors[];
 extern const char *rotor_names[];
+extern char plugboard[];
 
 
 void setup() 
@@ -79,6 +85,12 @@ void setup()
     #endif
     CurrentState = STATE_ERROR;
   }
+  else
+  {
+    #if SERIALDEBUG
+      Serial.println("ENIGMA: Welcome!");
+    #endif
+  }
 
 }
 
@@ -124,15 +136,17 @@ void loop()
 
     //Keyboard press detection
     letterIndex = readKeyboard();
-    if(letterIndex != letterIndex_Old)
+    //Serial.println(letterIndex);
+    if(letterIndex != letterIndex_Old && (letterIndex != -1))
     {
       newPress = 1;
+      Serial.println(alpha[letterIndex]);
     }else newPress = 0;
 
     letterIndex_Old = letterIndex;
 
     //Plugboard update
-    scannerPlugboard();
+    scannerPlugboard();   //180 ms
 
     //check for state transition
     if(CurrentState != prevState && CurrentState != STATE_ERROR)
@@ -156,11 +170,12 @@ void loop()
       */
       case STATE_STARTUP:
         //display HEIG text
-        for(int i = 0; i<4; i++)
+        for(int i = 0; i<6; i++)
         {
           sendLED(letterSequence[i], &LED, 255,0,0);  //write letter
           delay(1000);
         }
+        sendLED(-1, &LED, 255,0,0); //clear
 
         //init machine structure
         machine.reflector = reflectors[1];  //configure reflectors
@@ -172,6 +187,7 @@ void loop()
         {
           CurrentState = STATE_SYSTEM_ID;
           ui32_identStartTime = ui32_msCounter+IDENT_DELAY;  //set delay
+          digitalWrite(MOTOR_EN_PIN, 0);  //enable torque
         }
         else if(swiBig == 0 && swiSmall == 1) CurrentState = STATE_POS_SEL; //big one pressed, small not
         else if(swiBig == 1 && swiSmall == 1) CurrentState = STATE_ROTOR_SEL; //none pressed
@@ -184,13 +200,15 @@ void loop()
       */
       default:
       case STATE_ROTOR_SEL:
-        
+        //disable torque 
+        digitalWrite(MOTOR_EN_PIN, HIGH);
         //exit logic
         if(swiBig == 0 && swiSmall == 1)  CurrentState = STATE_POS_SEL;//only big lid closed
         else if(swiBig == 0 && swiSmall == 0)  //both switches pressed
         {
           CurrentState = STATE_SYSTEM_ID;
           ui32_identStartTime = ui32_msCounter+IDENT_DELAY; //delay - anormal order of operations
+          digitalWrite(MOTOR_EN_PIN, 0);  //enable torque
         }
       break;
 
@@ -199,13 +217,15 @@ void loop()
        * Exit condition: User closes the small lid
       */
       case STATE_POS_SEL:
-        
+        //disable torque 
+        digitalWrite(MOTOR_EN_PIN, HIGH);
         //exit logic
         if(swiBig ==  1) CurrentState = STATE_ROTOR_SEL; //big lid opens
         else if(swiBig == 0 && swiSmall == 0)  //both switches pressed
         {
           CurrentState = STATE_SYSTEM_ID;
           ui32_identStartTime = ui32_msCounter;  //no delay - normal way to go
+          digitalWrite(MOTOR_EN_PIN, 0);  //enable torque
         }
       break;
       
@@ -214,7 +234,7 @@ void loop()
        * Exit condition: Lid open | ID finished OK
       */
       case STATE_SYSTEM_ID:
-
+        //digitalWrite(MOTOR_EN_PIN, 0);  //enable torque
         if(ui32_msCounter >= ui32_identStartTime && !b_identValid) 
         {
           b_identValid = rotorID(&rotorConfig, &adc);
@@ -356,7 +376,7 @@ void loop()
        * Error state, stuck here :/
       */
       case STATE_ERROR:
-        sendLED(5, &LED, 255,0,0);  //RED E
+        sendLED('E', &LED, 255,0,0);  //RED E
         #if SERIALDEBUG
           Serial.println("Engima has encountered an error :(");
           Serial.print("State at the time of error: ");

@@ -30,32 +30,32 @@ struct LettrePin
 static LettrePin lettres[] = {
     // K7 / PCA9555 adresse 0x20
     {'Q', 0, 0},
-    {'A', 0, 1},
-    {'Y', 0, 2},
+    {'Y', 0, 1},
+    {'A', 0, 2},
     {'W', 0, 3},
-    {'S', 0, 4},
-    {'X', 0, 5},
+    {'X', 0, 4},
+    {'S', 0, 5},
     {'E', 0, 6},
-    {'D', 0, 7},
-    {'C', 0, 8},
+    {'C', 0, 7},
+    {'D', 0, 8},
     {'R', 0, 9},
-    {'F', 0, 10},
-    {'V', 0, 11},
+    {'V', 0, 10},
+    {'F', 0, 11},
     {'T', 0, 12},
-    {'G', 0, 13},
-    {'B', 0, 14},
+    {'B', 0, 13},
+    {'G', 0, 14},
     {'Z', 0, 15},
 
     // K8 / PCA9555 adresse 0x21
-    {'H', 1, 0},
-    {'N', 1, 1},
+    {'N', 1, 0},
+    {'H', 1, 1},
     {'U', 1, 2},
-    {'J', 1, 3},
-    {'M', 1, 4},
-    {'I', 1, 5},
-    {'K', 1, 6},
-    {'O', 1, 7},
-    {'L', 1, 8},
+    {'M', 1, 3},
+    {'J', 1, 4},
+    {'L', 1, 5},
+    {'I', 1, 6},
+    {'K', 1, 7},
+    {'O', 1, 8},
     {'P', 1, 9}};
 
 
@@ -135,7 +135,7 @@ static void activerLettreLow(uint8_t index)
     ioex0.direction(dir0);
     ioex1.direction(dir1);
 
-    delay(5);
+    // delay(5);
 }
 
 // ---------------------------------------------------------------------------
@@ -172,12 +172,13 @@ void scannerPlugboard()
 {
     initialiserPlugboard();
 
+    //182 ms delay :(
     for (uint8_t i = 0; i < NB_LETTRES; i++)
     {
         toutEnEntree();
-        delay(2);
+        // delay(2);               //2 ms delay
 
-        activerLettreLow(i);
+        activerLettreLow(i);    //5 ms delay
 
         uint16_t etat0 = ioex0.read();
         uint16_t etat1 = ioex1.read();
@@ -201,7 +202,6 @@ void scannerPlugboard()
             }
         }
     }
-
     toutEnEntree();
 }
 

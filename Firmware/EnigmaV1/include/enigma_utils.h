@@ -58,7 +58,7 @@ typedef struct RotorHardware_t
 /* Function prototypes */
 //Keyboard / LED
 int8_t readKeyboard(void);
-void sendLED(uint8_t index, Adafruit_NeoPixel* leds, uint8_t r, uint8_t g, uint8_t b);
+void sendLED(int8_t letter, Adafruit_NeoPixel *leds, uint8_t r, uint8_t g, uint8_t b);
 void configKeyboardPins(void);
 bool initLEDS(Adafruit_NeoPixel* leds);
 
