@@ -21,7 +21,7 @@ void setup() {
   while(!adc.begin(10,11,12,16))    //using soft SPI because I can't be arsed to make the hardware one work
   {                                 //and also it's not like we need to be fast anyways
     Serial.println("Failed to initialise");
-    delay(1000);
+    delay(100);
   }
   // Software SPI (specify all, use any available digital)
   // (sck, mosi, miso, cs);
@@ -36,5 +36,5 @@ void loop() {
   Serial.print("["); Serial.print(count); Serial.println("]");
   count++;
   
-  delay(1000);
+  delay(100);
 }

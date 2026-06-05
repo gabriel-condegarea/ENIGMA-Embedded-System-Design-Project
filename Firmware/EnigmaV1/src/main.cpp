@@ -14,13 +14,15 @@ RPI_PICO_Timer ITimer(0);
 
 //global vars
 RotorHardware_t rotorConfig = {.numRotors= NUMROTORS, .sensorOffset = 22, 
-                                .numSteps = 20,.enPin = MOTOR_EN_PIN, 
+                                .numSteps = 40, .enPin = MOTOR_EN_PIN, 
                                 .dirPins={DIR2_PIN, DIR1_PIN, DIR0_PIN}, 
-                                .directions={0,0,0}, 
+                                .directions={0,1,1}, 
                                 .stepPins={STEP2_PIN,STEP1_PIN,STEP0_PIN}
                             };
 uint32_t ui32_msCounter = 0;
 States CurrentState = STATE_STARTUP;
+
+uint8_t opt_debug = VERBOSE;
 
 //cipher vals
 extern const char *alpha;
@@ -35,7 +37,9 @@ void setup()
     Serial.begin(115200);
   #endif
 
-  Keyboard.begin(); //USB-HID device
+  #if USBKEYBOARD
+    Keyboard.begin(); //USB-HID device
+  #endif
 
   bool status = true;
 
@@ -115,15 +119,20 @@ void loop()
 
   uint8_t r, i; //loop operators
 
+
+
   //rotor ID
   bool b_identValid = false;
+  bool b_firstLetterPressed = false;
   uint8_t ui8_identCounter = 0; //number of ident counter
 
   //start animation
-  char letterSequence[7] = {"HEIGVD"};
+  char letterSequence[] = {"HEIGVD"};//{"QWERTZUIOPLKJHGFDSAYXCVBNM"};
+  uint16_t colorStep;
+  uint8_t colour[3];
 
   //timing
-  uint32_t ui32_identStartTime = 0;
+  uint32_t ui32_identStartTime = 0, ui32_lastIdent = 0;
   States prevState = CurrentState;
 
   //infinite loop
@@ -140,13 +149,22 @@ void loop()
     if(letterIndex != letterIndex_Old && (letterIndex != -1))
     {
       newPress = 1;
-      Serial.println(alpha[letterIndex]);
-    }else newPress = 0;
+      //Serial.println(letterIndex);
+      if(!b_firstLetterPressed) b_firstLetterPressed = true;
+    }
+    else newPress = 0; 
+
+    if(b_firstLetterPressed)  //after the first press
+    {
+      if(letterIndex == -1) sendLED(-1, &LED, 1,0,0,0);  //clear display if no press
+    }
+    
 
     letterIndex_Old = letterIndex;
 
     //Plugboard update
     scannerPlugboard();   //180 ms
+    //Serial.println(plugboard);
 
     //check for state transition
     if(CurrentState != prevState && CurrentState != STATE_ERROR)
@@ -158,8 +176,6 @@ void loop()
       #endif
     }
     
-
-
     /* FSM */
     switch(CurrentState)
     {
@@ -170,12 +186,15 @@ void loop()
       */
       case STATE_STARTUP:
         //display HEIG text
-        for(int i = 0; i<6; i++)
+        colorStep = 767/sizeof(letterSequence);
+        for(int i = 0; i<sizeof(letterSequence)-1; i++)
         {
-          sendLED(letterSequence[i], &LED, 255,0,0);  //write letter
-          delay(1000);
+          fade(colorStep*i, 255, &LED, colour);
+          //sendLED(letterSequence[i], &LED,1, colour[0],colour[1],colour[2]);  //write letter
+          sendLED(letterSequence[i], &LED,1, 255,0,0);  //write letter
+          delay(500);
         }
-        sendLED(-1, &LED, 255,0,0); //clear
+        sendLED(-1, &LED, 1, 255,0,0); //clear
 
         //init machine structure
         machine.reflector = reflectors[1];  //configure reflectors
@@ -187,7 +206,7 @@ void loop()
         {
           CurrentState = STATE_SYSTEM_ID;
           ui32_identStartTime = ui32_msCounter+IDENT_DELAY;  //set delay
-          digitalWrite(MOTOR_EN_PIN, 0);  //enable torque
+          __enableTorque;
         }
         else if(swiBig == 0 && swiSmall == 1) CurrentState = STATE_POS_SEL; //big one pressed, small not
         else if(swiBig == 1 && swiSmall == 1) CurrentState = STATE_ROTOR_SEL; //none pressed
@@ -201,14 +220,14 @@ void loop()
       default:
       case STATE_ROTOR_SEL:
         //disable torque 
-        digitalWrite(MOTOR_EN_PIN, HIGH);
+        __disableTorque;
         //exit logic
         if(swiBig == 0 && swiSmall == 1)  CurrentState = STATE_POS_SEL;//only big lid closed
         else if(swiBig == 0 && swiSmall == 0)  //both switches pressed
         {
           CurrentState = STATE_SYSTEM_ID;
           ui32_identStartTime = ui32_msCounter+IDENT_DELAY; //delay - anormal order of operations
-          digitalWrite(MOTOR_EN_PIN, 0);  //enable torque
+          __enableTorque;
         }
       break;
 
@@ -218,14 +237,14 @@ void loop()
       */
       case STATE_POS_SEL:
         //disable torque 
-        digitalWrite(MOTOR_EN_PIN, HIGH);
+        __disableTorque;
         //exit logic
         if(swiBig ==  1) CurrentState = STATE_ROTOR_SEL; //big lid opens
         else if(swiBig == 0 && swiSmall == 0)  //both switches pressed
         {
           CurrentState = STATE_SYSTEM_ID;
-          ui32_identStartTime = ui32_msCounter;  //no delay - normal way to go
-          digitalWrite(MOTOR_EN_PIN, 0);  //enable torque
+          ui32_identStartTime = ui32_msCounter; 
+          __enableTorque;
         }
       break;
       
@@ -234,53 +253,90 @@ void loop()
        * Exit condition: Lid open | ID finished OK
       */
       case STATE_SYSTEM_ID:
-        //digitalWrite(MOTOR_EN_PIN, 0);  //enable torque
-        if(ui32_msCounter >= ui32_identStartTime && !b_identValid) 
+        //__enableTorque;  //enable torque
+        if((ui32_msCounter >= ui32_identStartTime) 
+            && (!b_identValid) 
+            && (ui32_msCounter >= (ui32_lastIdent+IDENT_MINTIME))) 
         {
           b_identValid = rotorID(&rotorConfig, &adc);
+
+          Serial.println("ident done");
+          ui32_lastIdent = ui32_msCounter;
+
+          // if(!b_identValid)
+          // {
+          //   //manual ident override
+          //   rotorConfig.ident[0][0] = 3;  //rotors 423
+          //   rotorConfig.ident[1][0] = 2;
+          //   rotorConfig.ident[2][0] = 4;
+
+          //   rotorConfig.ident[0][1] = 3;  //start GVD
+          //   rotorConfig.ident[1][1] = 21;
+          //   rotorConfig.ident[2][1] = 6;
+
+          //   rotorConfig.ident[0][2] = 7;  //stellung AAA
+          //   rotorConfig.ident[1][2] = 4;
+          //   rotorConfig.ident[2][2] = 8;
+          // }
+
+          // b_identValid = true;
 
           if(b_identValid)  //identification OK
           {
             histPointer = 0; //reset move counter
+            availBackspace = 0;
+
+            //send OK to LEDS
+            b_firstLetterPressed = false;
+            sendLED('O', &LED, 1, 0, 255, 0);
+            sendLED('K', &LED, 0, 0, 255, 0);
             //configure rotors 
             for(r = 0; r<rotorConfig.numRotors; r++)  //all rotors
             {
-              machine.rotors[0] = new_rotor(&machine, rotorConfig.ident[r][0], 
+              machine.rotors[r] = new_rotor(&machine, rotorConfig.ident[r][0], 
                                                       rotorConfig.ident[r][1], 
-                                                      rotorConfig.ident[r][2]);
-
-              
-              posHistory[0][r] = rotorConfig.ident[r][0];  //store initial position in buffer
-
-              #if SERIALDEBUG
-                Serial.println("Initial position: ");
-                //Possible to add a way to print stellung
-                printPosition(Serial, &machine);
-                
-              #endif
+                                                      rotorConfig.ident[r][2]);              
+              posHistory[0][r] = rotorConfig.ident[r][1];  //store initial position in buffer
             } 
+
+            #if SERIALDEBUG
+              Serial.println("Initial position: ");
+              //Possible to add a way to print stellung
+              printPosition(Serial, &machine);
+              
+            #endif
           }
-          else ui8_identCounter++;
+          else
+          {
+            Serial.println("Ident failed");
+            ui8_identCounter++;
+          } 
 
           //if ident fails twice
-          if(ui8_identCounter <= 2) CurrentState = STATE_ERROR; 
+          if(ui8_identCounter == 2) CurrentState = STATE_ERROR; 
         }
 
         //exit conditions
-        if(swiBig == 1)
+        if(swiBig == 1) //big lid open
         {
-          CurrentState = STATE_ROTOR_SEL; //big lid open
+          CurrentState = STATE_ROTOR_SEL; 
           ui8_identCounter = 0; //reset counter
+          b_identValid = false;
         } 
-        else if(swiSmall == 1)
+        else if(swiSmall == 1) //small lid open
         {
-          CurrentState = STATE_POS_SEL;  //small lid open
+          CurrentState = STATE_POS_SEL;  
           ui8_identCounter = 0; //reset counter
+          b_identValid = false;
         } 
         else if(b_identValid)
         {
+          // sendLED('O', &LED, 1, 0, 255, 0);
+          // sendLED('K', &LED, 0, 0, 255, 0);
           CurrentState = STATE_OPERATION;  //Ident OK
           ui8_identCounter = 0; //reset counter
+          b_identValid = false; // for next time
+          __disableTorque;  //power-saving
         } 
       break;
 
@@ -291,8 +347,7 @@ void loop()
        * Exit condition: Lid open 
       */
       case STATE_OPERATION:
-        //copy logic from Tests/Algorithmes
-        
+      
         if(newPress)  //new key press
         {
           newPress = 0; //rst flag
@@ -304,33 +359,57 @@ void loop()
                 Serial.println("Invalid letter");
               #endif
               break;
-            case 25: //backspace
+            case 26: //backspace  
                 if(availBackspace > 0)
                 {
                   availBackspace--;
                   histPointer--;
-
+                  
+                  // debug: print history buffer
+                  // Serial.print("History buffer: ptr: ");
+                  // Serial.println(histPointer%HIST_BUFSIZE);
+                  // for(i = 0; i<HIST_BUFSIZE; i++)
+                  // {
+                  //   Serial.print(i);
+                  //   Serial.print(": ");
+                  //   Serial.print(posHistory[i][2]);
+                  //   Serial.print("|");
+                  //   Serial.print(posHistory[i][1]);
+                  //   Serial.print("|");
+                  //   Serial.println(posHistory[i][0]);
+                  // }
+                  
                   #if SERIALDEBUG
+                    Serial.println("Reading history from: ");
+                    Serial.println(histPointer%HIST_BUFSIZE);
                     Serial.print(availBackspace);
                     Serial.println(" backspaces left");
                   #endif
                   //send to USB
-                  Keyboard.write(8);
+                  #if USBKEYBOARD
+                    Keyboard.write(8);
+                  #endif
                   
                   for(r = 0; r<machine.numrotors; r++)  //move back one move
                   {
-                    machine.rotors[r].offset = posHistory[histPointer][r];
+                    machine.rotors[r].offset = posHistory[histPointer%HIST_BUFSIZE][r];
                   }
+                  __enableTorque;
                   moveAllRotors(&machine, &rotorConfig);  //physically move rotors
+                  __disableTorque;  //disable torque to conserve power and cool motors
+
+                  printPosition(Serial, &machine);
                 }
                 #if SERIALDEBUG
                   else Serial.println("Cannot delete more letters");
                 #endif
 
               break;
-            case 26: 
+            case 27:  //space 
                 //send to USB
-                Keyboard.write(32); 
+                #if USBKEYBOARD
+                  Keyboard.write(32); 
+                #endif
               break;
             default:  //normal letter
               character = alpha[letterIndex];
@@ -339,31 +418,48 @@ void loop()
                 Serial.println(character);
               #endif
 
-              //rotors cycling
+              //software rotors cycling
               cycleAllRotors(&machine);    
-              moveAllRotors(&machine, &rotorConfig);  //physically move rotors
 
+              //History buffer
               histPointer++; //move one step in the history buffer 
-              if(availBackspace < HIST_BUFSIZE) availBackspace++; //increment delete if not maxed out
+              if(availBackspace < (HIST_BUFSIZE-1)) availBackspace++; //increment delete if not maxed out
               for(r = 0; r<machine.numrotors;r++)
               {
                 posHistory[histPointer % HIST_BUFSIZE][r] = machine.rotors[r].offset;  //store history
               } 
+
+
 
               #if SERIALDEBUG
                 Serial.println("Position after cycling:");
                 printPosition(Serial, &machine);
               #endif
 
+              //encrypt character
               character = enigma_encrypt(&machine, character);
-
+              sendLED(character, &LED, 1, 252, 186, 3);
+              
               #if SERIALDEBUG
                 Serial.print("Output letter is ");
                 Serial.println(character);
               #endif
 
+              __enableTorque;
+              moveAllRotors(&machine, &rotorConfig);  //physically move rotors
+              __disableTorque;
+
               //send via USB
-              Keyboard.write(character);
+              #if USBKEYBOARD
+                //Swap y-z
+                if(character == 'Z') character = 'Y';//z
+                else if (character == 'Y') character = 'Z'; //y 
+                Keyboard.write(character);
+              #endif 
+
+              Serial.print(availBackspace);
+              Serial.println(" backspaces left");
+              
               break;
           }
         }
@@ -376,7 +472,7 @@ void loop()
        * Error state, stuck here :/
       */
       case STATE_ERROR:
-        sendLED('E', &LED, 255,0,0);  //RED E
+        sendLED('E', &LED, 1, 255,0,0);  //RED E
         #if SERIALDEBUG
           Serial.println("Engima has encountered an error :(");
           Serial.print("State at the time of error: ");

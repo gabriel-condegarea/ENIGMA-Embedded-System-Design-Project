@@ -7,7 +7,6 @@
 //const
 #define ROTATE 26
 
-#define OPT_DEBUG 1
 
 //structures
 struct Rotor 

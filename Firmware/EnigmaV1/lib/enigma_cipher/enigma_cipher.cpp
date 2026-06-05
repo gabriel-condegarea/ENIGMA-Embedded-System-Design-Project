@@ -1,5 +1,7 @@
 #include "enigma_cipher.h"
 
+#include <Arduino.h>
+
 //eww global vars
 
 const char *alpha = 
@@ -30,7 +32,7 @@ const char *rotor_names[] = {"I", "II", "III", "IV", "V", "VI", "VII", "VIII"}; 
 char plugboard[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";  
 
 
-// extern uint8_t opt_debug;
+extern uint8_t opt_debug;
 
 /*
  * Produce a rotor object
@@ -139,51 +141,70 @@ uint8_t cycleAllRotors(struct Enigma *machine)
         {
             machine->rotors[i].turnnext = 0;
             rotor_cycle(&machine->rotors[i+1]);
-            // if(opt_debug)
-            // {
-            //     printf("Cycling  rotor :%d \n", i+1);
-            //     printf("Turnover rotor :%d \n", i);
-            //     printf("Character  is  :%c \n", outChar);
-            // }
+            if(opt_debug)
+            {
+                Serial.print("Cycling rotor: ");
+                Serial.println(i+1);
+                Serial.print("Turnover rotor ");
+                Serial.println(i);
+                Serial.print("Character is ");
+                Serial.println(alpha[outChar]);
+            }
         }
     }
 
     return(outChar);
 }
 
-
+extern SerialUSB Serial;
 
 //TODO maybe delete all the printfs
 uint8_t enigma_encrypt(struct Enigma *machine, uint8_t inChar)
 {
     //local vars
     uint8_t index = 0, character = 0;
-    uint8_t i = 0; 
+    int8_t i = 0; 
 
+    char printBuf[100];
 
-    index = str_index(alpha, inChar); 
+    index = str_index(alpha, inChar);   //TODO replace with -'A'
     //plugboard 1
     index = str_index(alpha, plugboard[index]);
 
-    // if(opt_debug)
-    // {
-    //     printf("After plugboard: %c\n", alpha[index]);
-    // }
+    if(opt_debug)
+    {
+        Serial.print("After plugboard: ");
+        Serial.println(alpha[index]);
+    }
+
 
     // Pass through all the rotors forward
     for(i=0; i < machine->numrotors; i++)    //each rotor
     {   
-        // if(opt_debug) printf("In rotor %s as %c; ", machine->rotors[i].name, alpha[index]);
+        if(opt_debug)
+        {
+            sprintf(printBuf, "In rotor %s as %c; ", machine->rotors[i].name, alpha[index]);
+            Serial.print(printBuf);
+        } 
         index = rotor_forward(&machine->rotors[i], index);
-        // if(opt_debug) printf("Out rotor as %c\n", alpha[index]); 
+        if(opt_debug)
+        {
+            sprintf(printBuf, "Out rotor as %c", alpha[index]); 
+            Serial.println(printBuf);
+        } 
     }
 
-    // Pass through the reflector
-    // if(opt_debug) 
-    // {
-    //     printf("Into reflector as %c; ", alpha[index]);
-    //     printf("Out of reflector as %c\n", machine->reflector[index]);
-    // }
+    
+    //Pass through the reflector
+    if(opt_debug) 
+    {   
+        Serial.print("After rotors: ");
+        Serial.println(index);
+        sprintf(printBuf, "Into reflector as %c; ", alpha[index]);
+        Serial.print(printBuf);
+        sprintf(printBuf, "Out of reflector as %c\n", machine->reflector[index]);
+        Serial.print(printBuf);
+    }
 
     // Inbound 
     character = machine->reflector[index];
@@ -193,17 +214,35 @@ uint8_t enigma_encrypt(struct Enigma *machine, uint8_t inChar)
     // Pass back through the rotors in reverse
     for(i = machine->numrotors - 1; i >= 0; i--) 
     {
-        // if(opt_debug) printf("In rotor %s as %c; ", machine->rotors[i].name, alpha[index]);
+        if(opt_debug)
+        {
+            sprintf(printBuf, "In rotor %s as %c; ", machine->rotors[i].name, alpha[index]);
+            Serial.print(printBuf);
+        } 
+
         index = rotor_reverse(&machine->rotors[i], index);
-        // if(opt_debug) printf("Out rotor as %c\n", alpha[index]); 
+
+        if(opt_debug)
+        {
+            sprintf(printBuf, "Out rotor as %c", alpha[index]); 
+            Serial.println(printBuf);
+        } 
     }
+
+    // if(opt_debug)
+    // {
+    //     Serial.print("Back through rotors: ");
+    //     Serial.println(alpha[index]);
+    // }
 
     // Pass through Plugboard the 2nd time
     index = str_index(alpha, plugboard[index]);
-    // if(opt_debug)
-    // {
-    //     printf("After plugboard: %c\n", alpha[index]);
-    // }
+
+    if(opt_debug)
+    {
+        Serial.print("Back through plugboard: ");
+        Serial.println(alpha[index]);
+    }
 
     character = alpha[index];
 

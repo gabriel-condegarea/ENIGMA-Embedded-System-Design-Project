@@ -76,11 +76,12 @@ int8_t readKeyboard(void)
  *   sendLED(25) -> lights Z
  * ─────────────────────────────────────────────── */
 
-void sendLED(int8_t letter, Adafruit_NeoPixel *leds, uint8_t r, uint8_t g, uint8_t b)
+void sendLED(int8_t letter, Adafruit_NeoPixel *leds, bool clear, uint8_t r, uint8_t g, uint8_t b)
 {
   uint8_t index = 0;
-  leds->clear();
 
+  if(clear) leds->clear();
+  
   if(letter == -1)
   {
     leds->show();
@@ -216,7 +217,7 @@ bool rotorID(RotorHardware_t *rcfg, Adafruit_MCP3008 *adc)
   for (i = 0; i < (rcfg->numSteps / 2); i++) // advance half a letter
   {
     ALLROTORS digitalWrite(rcfg->stepPins[r], 1);
-    delay(5);
+    delay(PULSEDELAY);
     ALLROTORS digitalWrite(rcfg->stepPins[r], 0);
   }
 
@@ -224,13 +225,13 @@ bool rotorID(RotorHardware_t *rcfg, Adafruit_MCP3008 *adc)
   {
     for (i = 0; i < rcfg->numSteps; i++) // step one letter
     {
-      ALLROTORS
+      ALLROTORS //sensors: 0: 4,5 | 1: 2,3 | 2; 0,1 
       {
         digitalWrite(rcfg->stepPins[r], 1);
-        magnetData[r][0][l] += adc->readADC(2 * r);
-        magnetData[r][1][l] += adc->readADC(2 * r + 1);
+        magnetData[r][0][l] += adc->readADC(4- (2 * r));
+        magnetData[r][1][l] += adc->readADC(4-(2*r) + 1);
       }
-      delay(4);
+      delay(PULSEDELAY);
       ALLROTORS digitalWrite(rcfg->stepPins[r], 0);
     }
 
@@ -243,7 +244,7 @@ bool rotorID(RotorHardware_t *rcfg, Adafruit_MCP3008 *adc)
       lap_avg[r][1] += magnetData[r][1][l];
     }
 
-    delay(50);
+    //delay(50);
   }
 
   // Offset back half a letter
@@ -253,7 +254,7 @@ bool rotorID(RotorHardware_t *rcfg, Adafruit_MCP3008 *adc)
   for (i = 0; i < (rcfg->numSteps / 2); i++) // advance half a letter
   {
     ALLROTORS digitalWrite(rcfg->stepPins[r], 1);
-    delay(5);
+    delay(PULSEDELAY);
     ALLROTORS digitalWrite(rcfg->stepPins[r], 0);
   }
 
@@ -291,7 +292,13 @@ bool rotorID(RotorHardware_t *rcfg, Adafruit_MCP3008 *adc)
         numMagnets[r][0]++;
 
         if (numMagnets[r][0] > 3)
+        {
+          Serial.print("Error: ");
+          Serial.print("Too many number magnets on rotor ");
+          Serial.println(r);
           return (false);
+        }
+         
       }
 
       // text magnet
@@ -309,7 +316,13 @@ bool rotorID(RotorHardware_t *rcfg, Adafruit_MCP3008 *adc)
         firstMagnetIdx[r][1] = l;
         numMagnets[r][1]++;
         if (numMagnets[r][1] > 1)
+        {
+          Serial.print("Error: ");
+          Serial.print("Too many text magnets on rotor ");
+          Serial.println(r);
           return (false);
+        }
+          
       }
     }
   }
@@ -340,13 +353,14 @@ bool rotorID(RotorHardware_t *rcfg, Adafruit_MCP3008 *adc)
       rotorNum[r] |= (digit << (i - corrFirstMagnet[r]));
     }
 
-    rcfg->ident[r][0] = rotorNum[r];
+    rcfg->ident[r][0] = rotorNum[r]; 
     rcfg->ident[r][2] = (26 + firstMagnetIdx[r][0] - firstMagnetIdx[r][1] - stellungCorrector[r]) % 26;
     rcfg->ident[r][1] = (26 + rcfg->sensorOffset - firstMagnetIdx[r][0] + rcfg->ident[r][2] + stellungCorrector[r]) % 26;
 
+
     if (numMagnets[r][0] != 3 || numMagnets[r][1] != 1)
     {
-#if SERIALDEBUG
+    #if SERIALDEBUG
       Serial.print("Rotor ");
       Serial.print(r);
       Serial.print(": ");
@@ -354,25 +368,26 @@ bool rotorID(RotorHardware_t *rcfg, Adafruit_MCP3008 *adc)
       Serial.print(numMagnets[r][0]);
       Serial.print(", ");
       Serial.println(numMagnets[r][1]);
-#endif
+    #endif
       return (false); // not enough magnets found
     }
+    // Print data
+    #if SERIALDEBUG
+      // convert to letter
+      char letter[2] = {0};
+      sprintf(letter, "%c", rcfg->ident[r][1] + 'A');
+
+      Serial.println("Identification finished!");
+      Serial.print("Rotor number: ");
+      Serial.println(rcfg->ident[r][0], BIN);
+      Serial.print("Start Letter: ");
+      Serial.println(letter);
+      Serial.print("Stellung: ");
+      Serial.println(rcfg->ident[r][2]);
+    #endif
   }
 
-// Print data
-#if SERIALDEBUG
-  // convert to letter
-  char letter[2] = {0};
-  sprintf(letter, "%c", rcfg->ident[0][1] + 'A');
 
-  Serial.println("Identification finished!");
-  Serial.print("Rotor number: ");
-  Serial.println(rcfg->ident[0][0], BIN);
-  Serial.print("Start Letter: ");
-  Serial.println(letter);
-  Serial.print("Stellung: ");
-  Serial.println(rcfg->ident[0][2]);
-#endif
 
   return (true);
 }
@@ -388,27 +403,36 @@ bool moveAllRotors(struct Enigma *machine, RotorHardware_t *rcfg)
   uint8_t ui8_move = 0;
   int8_t deltaPos[NUMROTORS] = {0};
 
+  // Serial.println("Move all rotors:");
+
   ALLROTORS
   {
     deltaPos[r] = (machine->rotors[r].offset - machine->rotors[r].realPos); // compute offset, correct sign
+
+    // Serial.println(deltaPos[r]);
 
     // during operation machine should only move in the normal direction
     // unless it's a backspace, in which case up to -2 is possible 
     // negative probably means Z-A transition
     // other cases are rare enough to bother making them perfect.
-    if(deltaPos[r] < -2)  //not a backspace
-    {
-      deltaPos[r] += 26;  //
-    }
+    // Serial.print(deltaPos[r]);
+    // Serial.print("; ");
+    if(deltaPos[r] < -2) deltaPos[r] += 26; 
+    else if(deltaPos[r] == 25) deltaPos[r] = -1;
 
     if (deltaPos[r] != 0) // move needed
     {
       digitalWrite(rcfg->dirPins[r], deltaPos[r] >= 0 ? rcfg->directions[r] : !rcfg->directions[r]);  //write direction
-      deltaPos[r] < 0 ? -deltaPos[r] : deltaPos[r];     // compute absolute value
-      ui8_move >= deltaPos[r] ? ui8_move : deltaPos[r]; // find maximum number of moves for all rotors
+      if(deltaPos[r]<0) deltaPos[r] = -deltaPos[r];    // compute absolute value
+      // Serial.println(deltaPos[r]);
+      if(ui8_move < deltaPos[r]) ui8_move = deltaPos[r];
+      //ui8_move >= deltaPos[r] ? ui8_move : deltaPos[r]; // find maximum number of moves for all rotors
     }
   }
+  // Serial.println("");
 
+  // Serial.print("ui8_move: ");
+  // Serial.println(ui8_move);
   //TODO:Advanced : if rotor ends up on 'A', home using strongest magnet position
   //that would be dope but a bit hard maybe
   for (m = 0; m < ui8_move; m++) // for the max # of moves
@@ -416,7 +440,7 @@ bool moveAllRotors(struct Enigma *machine, RotorHardware_t *rcfg)
     for (i = 0; i < (rcfg->numSteps); i++) // advance a lettre if needed
     {
       ALLROTORS if (deltaPos[r] != 0) digitalWrite(rcfg->stepPins[r], 1);
-      delay(5);
+      delay(PULSEDELAY);
       ALLROTORS if (deltaPos[r] != 0) digitalWrite(rcfg->stepPins[r], 0);
     }
 
@@ -451,4 +475,60 @@ void printPosition(SerialUSB Serial, struct Enigma* machine)
                 alphabet[machine->rotors[2].offset],alphabet[machine->rotors[1].offset],alphabet[machine->rotors[0].offset] );
 
   Serial.println(buf);
+}
+
+
+
+
+/* FADE */
+/* returns fade colors depending on chosen step*/
+uint32_t fade(uint16_t fadestep, uint8_t brightness, Adafruit_NeoPixel *pixels, uint8_t* colours)
+{
+  uint8_t red, green, blue;
+  fadestep = fadestep % 768;  //clamp
+
+  if(fadestep < 256)
+  {
+    red = fadestep;
+    blue = 255-fadestep;
+    green = 0;
+  }
+  else if (fadestep < 512)  //from 256 to 511
+  { 
+    green = fadestep - 256;
+    red = 511-fadestep;
+    blue = 0;
+  }
+  else
+  {
+    green = 767 - fadestep;
+    blue = fadestep - 513;
+    red = 0;
+  }
+
+  // if(red == 0 && blue == 0 && green == 0)
+  // {
+  //   Serial.print("error at step: ");
+  //   Serial.println(fadestep);
+  //   Serial.print("(");
+  //   Serial.print(red);
+  //   Serial.print(",");
+  //   Serial.print(green);
+  //   Serial.print(",");
+  //   Serial.print(blue);
+  //   Serial.println(")");
+  // }
+
+
+  green = green*brightness/255;
+  red = red*brightness/255;
+  blue = blue*brightness/255;
+
+  colours[0] = red;
+  colours[1] = green;
+  colours[2] = blue;
+
+
+  uint32_t color = pixels->Color(red, green, blue);
+  return(color);
 }

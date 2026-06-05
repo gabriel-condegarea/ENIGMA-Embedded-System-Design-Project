@@ -20,15 +20,22 @@
 /* Constants and configuration */
 //Config
 /* Parameters */
-#define MAG_THR 15 //threshold for magnet detection
+#define MAG_THR 13 //threshold for magnet detection
 #define IDENT_DELAY 3000 //delay for anormal ident order
+#define IDENT_MINTIME 5000 //minimal delay between 2 idents, for thermal reasons.
 #define SERIALDEBUG 1
+
+#define VERBOSE 0 //detailed print of ciphering
+#define USBKEYBOARD 0
 
 #define HIST_BUFSIZE 15 //size of the old position buffer
 
 //State machine states
 typedef enum States {STATE_STARTUP, STATE_ROTOR_SEL, STATE_POS_SEL, STATE_SYSTEM_ID, STATE_OPERATION, STATE_ERROR}States;
 
+//Macros
+#define __enableTorque digitalWrite(MOTOR_EN_PIN, 0)
+#define __disableTorque digitalWrite(MOTOR_EN_PIN, 1)
 
 /* Constants */
 //Keyboard 
@@ -40,6 +47,8 @@ typedef enum States {STATE_STARTUP, STATE_ROTOR_SEL, STATE_POS_SEL, STATE_SYSTEM
 //Rotor ID
 #define NUMROTORS 3
 #define ALLROTORS for(r = 0; r < rcfg->numRotors; r++)
+#define PULSEDELAY 10
+// #define STEPDELAY 100
 
 
 /* Structures */
@@ -58,7 +67,7 @@ typedef struct RotorHardware_t
 /* Function prototypes */
 //Keyboard / LED
 int8_t readKeyboard(void);
-void sendLED(int8_t letter, Adafruit_NeoPixel *leds, uint8_t r, uint8_t g, uint8_t b);
+void sendLED(int8_t letter, Adafruit_NeoPixel *leds, bool clear, uint8_t r, uint8_t g, uint8_t b);
 void configKeyboardPins(void);
 bool initLEDS(Adafruit_NeoPixel* leds);
 
@@ -73,6 +82,7 @@ bool moveAllRotors(struct Enigma *machine, RotorHardware_t* rcfg);
 bool timerHandlerMillis(struct repeating_timer *t);
 
 void printPosition(SerialUSB Serial, struct Enigma* machine);
+uint32_t fade(uint16_t fadestep, uint8_t brightness, Adafruit_NeoPixel *pixels, uint8_t* colours);
 
 
 /* Hardware definitions */
